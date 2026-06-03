@@ -522,12 +522,14 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
       />
 
       {open && (
-        <div className="animate-fade-in glass" style={{
+        <div className="animate-fade-in" style={{
           position:"absolute", top:"calc(100% + 5px)", left:0, right:0,
           borderRadius:12, zIndex:300, overflow:"hidden",
-          backdropFilter:"blur(30px) saturate(200%)",
-          WebkitBackdropFilter:"blur(30px) saturate(200%)",
-          boxShadow:"var(--shadow-dropdown)",
+          background:"var(--cal-window-bg)",
+          border:"1.5px solid var(--cal-border)",
+          backdropFilter:"blur(40px) saturate(180%)",
+          WebkitBackdropFilter:"blur(40px) saturate(180%)",
+          boxShadow:"0 8px 32px rgba(0,0,0,0.22)",
         }}>
           <div style={{ maxHeight:200, overflowY:"auto" }}>
             {filtered.length === 0 ? (
