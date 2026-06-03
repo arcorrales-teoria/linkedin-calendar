@@ -53,6 +53,7 @@ const MONTHS_ABR  = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT"
 const PEOPLE = [
   "Ericka Ortegon", "Maria Juliana", "Mafe Ramirez", "Mariangel",
   "Gabriela Cala", "Alessandra Huapaya", "Cesar Lengua", "Manuela Peña", "Daniel Bilbao",
+  "Daniel Villegas", "Lony Milena", "Christian Rojas",
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
