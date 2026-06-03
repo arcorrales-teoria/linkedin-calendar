@@ -1161,14 +1161,7 @@ export default function CalendarPage() {
   const [filter, setFilter] = useState<CountryKey>("LATAM");
   const [year,   setYear]   = useState(() => TODAY.getFullYear());
   const [month,  setMonth]  = useState(() => TODAY.getMonth());
-  const [pubs,   setPubs]   = useState<Publication[]>(() => {
-    if (typeof window === "undefined") return SEED;
-    try {
-      const stored = localStorage.getItem("linkedin-calendar-pubs");
-      if (stored) return JSON.parse(stored) as Publication[];
-    } catch {}
-    return SEED;
-  });
+  const [pubs,   setPubs]   = useState<Publication[]>(SEED);
   const [modal,  setModal]  = useState<ModalState>({ mode:"closed" });
 
   const todayStr = toDateStr(TODAY);
@@ -1178,8 +1171,11 @@ export default function CalendarPage() {
   }, [dark]);
 
   useEffect(() => {
-    localStorage.setItem("linkedin-calendar-pubs", JSON.stringify(pubs));
-  }, [pubs]);
+    fetch("/api/publications")
+      .then(r => r.json())
+      .then((data: Publication[]) => { if (Array.isArray(data) && data.length > 0) setPubs(data); })
+      .catch(() => {});
+  }, []);
 
   const visiblePubs = useMemo(() => pubs.filter(p => filter === "LATAM" || p.country === filter), [pubs, filter]);
   const weeks = useMemo(() => getMonthGrid(year, month), [year, month]);
@@ -1187,14 +1183,32 @@ export default function CalendarPage() {
   function prevMonth() { if (month === 0) { setMonth(11); setYear(y=>y-1); } else setMonth(m=>m-1); }
   function nextMonth() { if (month === 11) { setMonth(0); setYear(y=>y+1); } else setMonth(m=>m+1); }
 
+  function persistPubs(updated: Publication[]) {
+    fetch("/api/publications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+  }
+
   function savePub(p: Publication) {
     setPubs(prev => {
       const i = prev.findIndex(x => x.id === p.id);
-      if (i >= 0) { const n = [...prev]; n[i] = p; return n; }
-      return [...prev, p];
+      const updated = i >= 0
+        ? prev.map((x, idx) => idx === i ? p : x)
+        : [...prev, p];
+      persistPubs(updated);
+      return updated;
     });
   }
-  function deletePub(id: string) { setPubs(prev => prev.filter(p => p.id !== id)); setModal({ mode:"closed" }); }
+  function deletePub(id: string) {
+    setPubs(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      persistPubs(updated);
+      return updated;
+    });
+    setModal({ mode:"closed" });
+  }
 
   function weekFlags(week: Date[]) {
     const seen = new Set<string>();
