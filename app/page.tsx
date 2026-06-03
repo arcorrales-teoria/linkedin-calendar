@@ -93,6 +93,32 @@ function eventsForDay(day: Date, pubs: Publication[]): Array<{pub:Publication; r
     });
 }
 
+function getWeekEvents(week: Date[], pubs: Publication[]) {
+  const ws = toDateStr(week[0]);
+  const we = toDateStr(week[6]);
+  return pubs
+    .filter(p => p.endDate >= ws && p.startDate <= we)
+    .map(p => {
+      const startCol = p.startDate <= ws ? 0 : week.findIndex(d => toDateStr(d) === p.startDate);
+      const endCol   = p.endDate   >= we ? 6 : week.findIndex(d => toDateStr(d) === p.endDate);
+      return { pub: p, startCol, endCol };
+    });
+}
+
+function layoutWeekEvents(events: Array<{pub:Publication; startCol:number; endCol:number}>) {
+  const rows: Array<Array<{pub:Publication; startCol:number; endCol:number}>> = [];
+  for (const ev of events) {
+    let placed = false;
+    for (const row of rows) {
+      if (!row.some(e => e.startCol <= ev.endCol && e.endCol >= ev.startCol)) {
+        row.push(ev); placed = true; break;
+      }
+    }
+    if (!placed) rows.push([ev]);
+  }
+  return rows;
+}
+
 
 function generatePost(pub: Publication): string {
   const cn = pub.country === "LATAM" ? "LATAM" : CMAP[pub.country].label;
@@ -1340,15 +1366,19 @@ export default function CalendarPage() {
         <div role="grid" aria-label={`${MONTHS_FULL[month]} ${year}`}
           style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
           {weeks.map((week, wi) => {
-            const flags = weekFlags(week);
+            const flags      = weekFlags(week);
+            const evRows     = layoutWeekEvents(getWeekEvents(week, visiblePubs));
+            const evRowCount = evRows.length;
+
             return (
               <div key={wi} role="row" style={{
-                flex:1, display:"grid", gridTemplateColumns:"36px repeat(7,1fr)",
+                flex:1, display:"flex",
                 borderBottom: wi < weeks.length-1 ? `1px solid var(--cal-border)` : "none",
-                minHeight:0,
+                minHeight: Math.max(72, 32 + evRowCount * 26 + 8),
               }}>
                 {/* Week gutter */}
                 <div aria-hidden="true" style={{
+                  width:36, flexShrink:0,
                   borderRight:"1px solid var(--cal-border)",
                   display:"flex", flexDirection:"column",
                   alignItems:"center", paddingTop:6, gap:2, overflow:"hidden",
@@ -1358,62 +1388,108 @@ export default function CalendarPage() {
                   ))}
                 </div>
 
-                {/* Day cells */}
-                {week.map((day, di) => {
-                  const ds      = toDateStr(day);
-                  const isToday = ds === todayStr;
-                  const inMonth = isCurrentMonth(day);
-                  const dayEvs  = eventsForDay(day, visiblePubs);
-                  const weekend = di===0 || di===6;
+                {/* Days area */}
+                <div style={{ flex:1, display:"grid", gridTemplateColumns:"repeat(7,1fr)", position:"relative" }}>
 
-                  return (
-                    <div key={di} role="gridcell" tabIndex={0}
-                      aria-label={`${day.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}${dayEvs.length?`, ${dayEvs.length} post${dayEvs.length>1?"s":""}`:""}`}
-                      onClick={() => setModal({ mode:"create", date:ds })}
-                      onKeyDown={e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); setModal({ mode:"create", date:ds }); } }}
-                      style={{
-                        borderLeft:"1px solid var(--cal-border)",
-                        padding:0, cursor:"pointer",
-                        background: isToday
-                          ? "var(--cal-cell-today)"
-                          : weekend ? "var(--cal-cell-weekend)" : "var(--cal-cell-bg)",
-                        display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0,
-                        transition:"background 150ms",
-                        outline:"none",
-                      }}
-                      onMouseEnter={e => { if (!isToday) (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-hover)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isToday ? "var(--cal-cell-today)" : weekend ? "var(--cal-cell-weekend)" : "var(--cal-cell-bg)"; }}
-                      onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "inset 0 0 0 2px var(--accent)"; }}
-                      onBlur={e  => { (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
-                    >
-                      <div style={{ padding:"4px 5px 2px", display:"flex", justifyContent:"flex-end", flexShrink:0 }}>
-                        <span style={{
-                          display:"inline-flex", alignItems:"center", justifyContent:"center",
-                          width:24, height:24, borderRadius:"50%", fontSize:12,
-                          fontFamily:"var(--font-sans)", fontWeight: isToday ? 700 : 500,
-                          background: isToday ? "var(--accent)" : "transparent",
-                          color: isToday ? "var(--accent-text)" : inMonth ? "var(--text-primary)" : "var(--text-muted)",
-                          opacity: inMonth ? 1 : 0.30,
-                          boxShadow: isToday ? "0 2px 10px rgba(var(--accent-rgb),0.45)" : "none",
-                        }}>
-                          {day.getDate()}
-                        </span>
-                      </div>
+                  {/* Day background cells — click targets + date numbers */}
+                  {week.map((day, di) => {
+                    const ds      = toDateStr(day);
+                    const isToday = ds === todayStr;
+                    const inMonth = isCurrentMonth(day);
+                    const weekend = di===0 || di===6;
 
-                      <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", flex:1, minHeight:0 }}>
-                        {dayEvs.slice(0,3).map(({ pub, role }) => (
-                          <EventChip key={pub.id+role} pub={pub} role={role} dark={dark}
-                            onClick={() => setModal({ mode:"view", pub })} />
-                        ))}
-                        {dayEvs.length > 3 && (
-                          <span style={{ fontSize:11, fontWeight:500, color:"var(--text-secondary)", padding:"0 5px 3px", flexShrink:0 }}>
-                            +{dayEvs.length-3} more
+                    return (
+                      <div key={di} role="gridcell" tabIndex={0}
+                        aria-label={day.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+                        onClick={() => setModal({ mode:"create", date:ds })}
+                        onKeyDown={e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); setModal({ mode:"create", date:ds }); } }}
+                        style={{
+                          borderLeft: di > 0 ? "1px solid var(--cal-border)" : "none",
+                          cursor:"pointer",
+                          background: isToday
+                            ? "var(--cal-cell-today)"
+                            : weekend ? "var(--cal-cell-weekend)" : "var(--cal-cell-bg)",
+                          display:"flex", flexDirection:"column",
+                          transition:"background 150ms", outline:"none",
+                        }}
+                        onMouseEnter={e => { if (!isToday) (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-hover)"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isToday ? "var(--cal-cell-today)" : weekend ? "var(--cal-cell-weekend)" : "var(--cal-cell-bg)"; }}
+                        onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "inset 0 0 0 2px var(--accent)"; }}
+                        onBlur={e  => { (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
+                      >
+                        <div style={{ padding:"4px 5px 2px", display:"flex", justifyContent:"flex-end", flexShrink:0 }}>
+                          <span style={{
+                            display:"inline-flex", alignItems:"center", justifyContent:"center",
+                            width:24, height:24, borderRadius:"50%", fontSize:12,
+                            fontFamily:"var(--font-sans)", fontWeight: isToday ? 700 : 500,
+                            background: isToday ? "var(--accent)" : "transparent",
+                            color: isToday ? "var(--accent-text)" : inMonth ? "var(--text-primary)" : "var(--text-muted)",
+                            opacity: inMonth ? 1 : 0.30,
+                            boxShadow: isToday ? "0 2px 10px rgba(var(--accent-rgb),0.45)" : "none",
+                          }}>
+                            {day.getDate()}
                           </span>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+
+                  {/* Spanning event chips — absolutely positioned over the grid */}
+                  {evRows.flatMap((row, rowIdx) =>
+                    row.map(({ pub, startCol, endCol }) => {
+                      const c       = CMAP[pub.country];
+                      const bg      = dark ? c.bgDark : c.bgLight;
+                      const fg      = dark ? c.colorDark : c.color;
+                      const colSpan = endCol - startCol + 1;
+                      return (
+                        <button
+                          key={pub.id}
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setModal({ mode:"view", pub }); }}
+                          title={pub.title}
+                          style={{
+                            position:"absolute",
+                            top: 30 + rowIdx * 26,
+                            left:`calc(${startCol} / 7 * 100% + 2px)`,
+                            width:`calc(${colSpan} / 7 * 100% - 4px)`,
+                            height:22,
+                            zIndex:10,
+                            background:bg, color:fg,
+                            backdropFilter:"blur(14px) saturate(200%)",
+                            WebkitBackdropFilter:"blur(14px) saturate(200%)",
+                            border:`1px solid rgba(255,255,255,0.30)`,
+                            borderRadius:6,
+                            cursor:"pointer", fontSize:11,
+                            fontFamily:"var(--font-sans)", fontWeight:600,
+                            overflow:"hidden", whiteSpace:"nowrap",
+                            display:"flex", alignItems:"center",
+                            padding:"0 6px", gap:4,
+                            boxShadow:"0 4px 12px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.55)",
+                            transition:"opacity 120ms, transform 200ms",
+                          }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLElement).style.opacity = "0.88";
+                            (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLElement).style.opacity = "1";
+                            (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+                          }}
+                        >
+                          <span style={{ fontSize:12, flexShrink:0 }}>{c.flag}</span>
+                          <span style={{ overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>{pub.title}</span>
+                          <span style={{ display:"flex", alignItems:"center", gap:0, flexShrink:0 }}>
+                            {pub.people.slice(0,2).map((p, i) => (
+                              <span key={i} style={{ marginLeft: i===0 ? 0 : -4 }}>
+                                <PersonBadge name={p} size={16} />
+                              </span>
+                            ))}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             );
           })}
