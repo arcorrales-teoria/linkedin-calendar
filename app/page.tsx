@@ -1161,7 +1161,14 @@ export default function CalendarPage() {
   const [filter, setFilter] = useState<CountryKey>("LATAM");
   const [year,   setYear]   = useState(() => TODAY.getFullYear());
   const [month,  setMonth]  = useState(() => TODAY.getMonth());
-  const [pubs,   setPubs]   = useState<Publication[]>(SEED);
+  const [pubs,   setPubs]   = useState<Publication[]>(() => {
+    if (typeof window === "undefined") return SEED;
+    try {
+      const stored = localStorage.getItem("linkedin-calendar-pubs");
+      if (stored) return JSON.parse(stored) as Publication[];
+    } catch {}
+    return SEED;
+  });
   const [modal,  setModal]  = useState<ModalState>({ mode:"closed" });
 
   const todayStr = toDateStr(TODAY);
@@ -1169,6 +1176,10 @@ export default function CalendarPage() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  useEffect(() => {
+    localStorage.setItem("linkedin-calendar-pubs", JSON.stringify(pubs));
+  }, [pubs]);
 
   const visiblePubs = useMemo(() => pubs.filter(p => filter === "LATAM" || p.country === filter), [pubs, filter]);
   const weeks = useMemo(() => getMonthGrid(year, month), [year, month]);
