@@ -1691,19 +1691,33 @@ function PostCreator({ dark, pubs }: { dark: boolean; pubs: Publication[] }) {
     const pub = pubs.find(p => p.id === selectedPubId);
     if (!pub) return;
     const c = CMAP[pub.country];
-    setTopic(pub.title + (pub.content ? `\n\n${pub.content}` : ""));
+    setTopic(pub.content ? pub.content : pub.title);
     const auto = autoConfigFromPub(pub);
     setFocus(auto.focus);
     if (!profile) setTone(auto.tone);
   }, [selectedPubId, pubs, profile]);
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!topic.trim()) return;
     setIsGen(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/generate-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, tone, focus, length, profile, language }),
+      });
+      const data = await res.json();
+      if (data.ok && data.content) {
+        setGenerated(data.content);
+      } else {
+        // Fallback to local generation if API fails
+        setGenerated(buildGeneratedPost(topic, tone, focus, length, profile));
+      }
+    } catch {
       setGenerated(buildGeneratedPost(topic, tone, focus, length, profile));
+    } finally {
       setIsGen(false);
-    }, 900);
+    }
   }
 
   async function handleCopy() {
