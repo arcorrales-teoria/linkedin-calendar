@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* ── Liquid Glass Design System ─────────────────────────────────────────────── */
+/* ── LinkedIn Calendar — LATAM ───────────────────────────────────────────────── */
 
 :root {
-  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-geist-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   /* ── Text ── */
   --text-primary:   rgba(20, 18, 40, 0.90);
@@ -48,9 +48,9 @@
    The gradient background (purple/pink/blue) must bleed through.
 ── */
 [data-theme="dark"] {
-  --text-primary:   rgba(238, 235, 255, 0.92);
-  --text-secondary: rgba(200, 196, 230, 0.62);
-  --text-muted:     rgba(160, 156, 200, 0.44);
+  --text-primary:   rgba(238, 235, 255, 0.95);
+  --text-secondary: rgba(200, 196, 230, 0.78);
+  --text-muted:     rgba(160, 156, 200, 0.58);
 
   --accent:      #a78bfa;
   --accent-rgb:  167, 139, 250;
@@ -65,23 +65,23 @@
   --shadow-dropdown: 0 12px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.40), inset 0 1.5px 0 rgba(255,255,255,0.10);
 
   /* ── Calendar surface tokens — DARK ──
-     Deep purple/navy tinted glass — gradient bleeds through.
-     NOT pure black. Matches the purple/blue gradient background.
+     High-opacity surfaces — light text must always pass 4.5:1 contrast.
+     Gradient bleeds through only at the window level (backdrop-filter).
   ── */
-  --cal-window-bg:     rgba(18, 12, 48, 0.62);
-  --cal-titlebar-bg:   rgba(18, 12, 48, 0.50);
-  --cal-toolbar-bg:    rgba(18, 12, 48, 0.40);
-  --cal-section-bg:    rgba(18, 12, 48, 0.32);
-  --cal-header-bg:     rgba(18, 12, 48, 0.42);
-  --cal-statusbar-bg:  rgba(18, 12, 48, 0.48);
-  --cal-cell-bg:       rgba(30, 20, 65, 0.35);
-  --cal-cell-weekend:  rgba(10, 6, 30, 0.45);
-  --cal-cell-today:    rgba(167, 139, 250, 0.18);
-  --cal-cell-hover:    rgba(255, 255, 255, 0.10);
-  --cal-border:        rgba(255, 255, 255, 0.10);
-  --cal-urlbar-bg:     rgba(18, 12, 48, 0.55);
+  --cal-window-bg:     rgba(12, 8, 36, 0.90);
+  --cal-titlebar-bg:   rgba(10, 6, 30, 0.88);
+  --cal-toolbar-bg:    rgba(10, 6, 30, 0.85);
+  --cal-section-bg:    rgba(14, 10, 40, 0.82);
+  --cal-header-bg:     rgba(10, 6, 30, 0.85);
+  --cal-statusbar-bg:  rgba(10, 6, 30, 0.88);
+  --cal-cell-bg:       rgba(20, 13, 52, 0.78);
+  --cal-cell-weekend:  rgba(8, 4, 24, 0.85);
+  --cal-cell-today:    rgba(167, 139, 250, 0.22);
+  --cal-cell-hover:    rgba(255, 255, 255, 0.08);
+  --cal-border:        rgba(255, 255, 255, 0.09);
+  --cal-urlbar-bg:     rgba(12, 8, 36, 0.82);
   --cal-urlbar-border: rgba(255, 255, 255, 0.12);
-  --cal-modal-overlay: rgba(8, 4, 24, 0.55);
+  --cal-modal-overlay: rgba(4, 2, 16, 0.72);
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────────── */
@@ -105,12 +105,12 @@ body {
   background-attachment: fixed;
 }
 
-/* Dark: same gradient but with a subtle deep-purple tint — 30% max */
+/* Dark: deep-purple overlay to kill gradient bleed behind the calendar */
 [data-theme="dark"] body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(8, 4, 28, 0.34);
+  background: rgba(6, 3, 20, 0.62);
   pointer-events: none;
   z-index: 0;
 }
@@ -198,6 +198,11 @@ body {
 .animate-backdrop { animation: backdropIn 200ms ease-out both; }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
 }
@@ -209,4 +214,23 @@ body {
 [data-theme="dark"] select option {
   background: #120c30;
   color: rgba(238, 235, 255, 0.92);
+}
+
+/* ── Dark mode: override all hardcoded white-tinted rgba backgrounds ── */
+[data-theme="dark"] .post-input {
+  background: rgba(30, 20, 70, 0.65) !important;
+  color: rgba(238, 235, 255, 0.95) !important;
+}
+[data-theme="dark"] .post-panel {
+  background: rgba(14, 8, 40, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Dark-mode surface override for elements with hardcoded white-tinted backgrounds */
+[data-theme="dark"] .dm-surface {
+  background: rgba(20, 12, 52, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+[data-theme="dark"] .dm-surface-subtle {
+  background: rgba(14, 8, 42, 0.70) !important;
 }

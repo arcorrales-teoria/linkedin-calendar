@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "LinkedIn Calendar — LATAM",
-  description: "Publication calendar for LinkedIn content planning across LATAM",
+  description: "Calendario de publicaciones LinkedIn para equipos de contenido en LATAM",
 };
 
 export default function RootLayout({
@@ -20,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="es" suppressHydrationWarning className={GeistSans.variable}>
       <body className="antialiased">
         {children}
       </body>
