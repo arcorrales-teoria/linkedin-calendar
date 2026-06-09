@@ -1,6 +1,32 @@
 # LinkedIn Calendar — LATAM Content Planner
 
-Herramienta de planificación y generación de contenido para LinkedIn, diseñada para equipos de marketing LATAM que gestionan múltiples cuentas regionales. Combina un calendario visual mensual con generación de posts mediante IA (GPT-4o) y perfiles de tono personalizados por autor.
+Herramienta interna de Truora para planificar y generar contenido de LinkedIn en LATAM. Combina un calendario visual mensual con generación de posts mediante IA (GPT-4o) y perfiles de tono personalizados por autor.
+
+---
+
+## Contexto del proyecto
+
+**Empresa:** Truora Inc.
+**Mercados:** Colombia, Perú, Chile, México, Argentina.
+**Usuarios:** Equipo de marketing y Growth de Truora — las personas que gestionan las cuentas de LinkedIn de la empresa y de sus voceros.
+
+### El problema que resuelve
+
+El equipo de contenido de Truora publica regularmente en LinkedIn para audiencias del sector financiero (bancos, fintechs, sofoms, lenders, wallets). El desafío es doble:
+
+1. **Consistencia de calendario**: coordinar qué se publica, cuándo y en qué mercado, sin perder el hilo de lo que ya está planeado.
+2. **Consistencia de voz**: cada persona del equipo tiene su estilo de escritura. Cuando la IA genera un borrador, tiene que sonar como esa persona, no como un bot corporativo.
+
+### Cómo lo resuelve
+
+- El **calendario** permite ver de un vistazo todas las publicaciones planeadas por país, asignar personas y vincular contenido directamente a cada fecha.
+- El **generador de posts** usa un system prompt con el estilo editorial de Truora (conversacional, directo, con Spanglish, sin guiones largos) para que GPT-4o genere borradores listos para editar, no para reescribir desde cero.
+- Los **perfiles de tono** capturan el estilo real de cada persona (emojis, hashtags, preguntas retóricas, vocabulario frecuente) y los aplican al momento de generar.
+- El botón **"Publicar en LinkedIn"** abre el compositor de LinkedIn con el texto ya cargado.
+
+### Audiencia objetivo del contenido generado
+
+CMOs, Heads of Growth, Product Owners, Product Managers y líderes de negocio en el sector financiero de LATAM. La propuesta de valor de Truora que el contenido comunica es: confianza digital simple, segura y con menos fricción.
 
 ---
 
