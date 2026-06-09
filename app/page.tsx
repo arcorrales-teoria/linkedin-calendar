@@ -973,8 +973,9 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
   }
 
   async function handlePostLinkedIn() {
-    try { await navigator.clipboard.writeText(content || title); setCopied(true); setTimeout(() => setCopied(false), 3000); } catch (_) {}
-    window.open("https://www.linkedin.com/feed/", "_blank", "noopener,noreferrer");
+    const text = content || title;
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 3000); } catch (_) {}
+    window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 
   const inputStyle: React.CSSProperties = {
@@ -1725,7 +1726,10 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
     try { await navigator.clipboard.writeText(generated); setCopied(true); setTimeout(()=>setCopied(false),3000); } catch {}
   }
 
-  function handlePostLinkedIn() { handleCopy(); window.open("https://www.linkedin.com/feed/","_blank","noopener,noreferrer"); }
+  async function handlePostLinkedIn() {
+    await handleCopy();
+    window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(generated)}`, "_blank", "noopener,noreferrer");
+  }
 
   async function handleSavePost(savePerson: string) {
     setSaveStatus("saving");
