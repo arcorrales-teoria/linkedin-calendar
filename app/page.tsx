@@ -936,13 +936,14 @@ function DateRangePicker({
 
 // ── PublicationModal ──────────────────────────────────────────────────────────
 
-function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit }: {
+function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGoToCreate }: {
   state: Exclude<ModalState, { mode: "closed" }>;
   dark: boolean;
   onSave: (p: Publication) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
   onEdit: (pub: Publication) => void;
+  onGoToCreate: (pubId: string) => void;
 }) {
   const isCreate = state.mode === "create";
   const isView   = state.mode === "view";
@@ -1168,7 +1169,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit }: {
                 </button>
 
                 <button type="button"
-                  onClick={() => { onEdit({ ...existing!, content: generatePost(existing!) }); }}
+                  onClick={() => { onGoToCreate(existing!.id); }}
                   className="ripple-effect hover-lift"
                   style={{
                     flex:1, height:42, borderRadius:12,
@@ -1182,7 +1183,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit }: {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.78"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
                 >
-                  ✦ Generate post
+                  ✦ Generar post
                 </button>
               </div>
 
@@ -1660,8 +1661,8 @@ function SavePostModal({
 
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
-function PostCreator({ dark, pubs }: { dark: boolean; pubs: Publication[] }) {
-  const [selectedPubId, setSelectedPubId] = useState("");
+function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Publication[]; initialPubId?: string }) {
+  const [selectedPubId, setSelectedPubId] = useState(initialPubId ?? "");
   const [topic,    setTopic]    = useState("");
   const [language, setLanguage] = useState("Español");
   const [tone,     setTone]     = useState("Profesional");
@@ -2323,6 +2324,7 @@ function FloatingOrbs() {
 export default function CalendarPage() {
   const [dark,      setDark]      = useState(false);
   const [activeTab, setActiveTab] = useState<"calendar"|"create">("calendar");
+  const [createPubId, setCreatePubId] = useState("");
   const [filter, setFilter] = useState<CountryKey>("LATAM");
   const [year,   setYear]   = useState(() => TODAY.getFullYear());
   const [month,  setMonth]  = useState(() => TODAY.getMonth());
@@ -2444,7 +2446,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} />}
+        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} initialPubId={createPubId} key={createPubId} />}
 
         {activeTab === "calendar" && <>
         {/* ── Month header ── */}
@@ -2682,6 +2684,7 @@ export default function CalendarPage() {
           onDelete={deletePub}
           onClose={() => setModal({ mode:"closed" })}
           onEdit={pub => setModal({ mode:"edit", pub })}
+          onGoToCreate={pubId => { setModal({ mode:"closed" }); setCreatePubId(pubId); setActiveTab("create"); }}
         />
       )}
     </div>
