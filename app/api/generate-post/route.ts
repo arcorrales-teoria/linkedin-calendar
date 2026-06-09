@@ -102,11 +102,25 @@ Los cierres deben variar: nunca repetir el mismo cierre en todas las versiones.
 
 🔹 FORMATOS QUE SE USAN (NO CAMBIAR)
 
-Hooks fuertes al inicio.
+Hooks fuertes al inicio. El hook es SIEMPRE la primera línea y va solo, separado del resto por una línea en blanco. Máximo 2 líneas, casi siempre 1. NUNCA pegues el hook al cuerpo del texto.
 Párrafos cortos.
 Listas simples cuando hay más de 3 elementos técnicos.
 Separadores con líneas o espacios.
 Pregunta final para engagement cuando aplica.
+
+🔹 ESTRUCTURA OBLIGATORIA DEL POST
+
+[HOOK — 1 línea, máximo 2]
+
+[línea en blanco]
+
+[Cuerpo del post]
+
+[línea en blanco]
+
+[CTA o cierre]
+
+Esta estructura es fija e innegociable. El hook NUNCA va pegado al primer párrafo del cuerpo.
 
 🔹 CHECKLIST ANTES DE RESPONDER
 Antes de entregar el texto final, verifica:
@@ -156,7 +170,9 @@ Parámetros:
 - Longitud: ${lengthHint}
 - Idioma: ${language ?? "Español"}${profileContext}
 
-Entrega solo el post final, listo para publicar. Sin explicaciones ni comentarios adicionales.`;
+Entrega solo el post final, listo para publicar. Sin explicaciones ni comentarios adicionales.
+
+IMPORTANTE: El hook va en la primera línea, solo, seguido de una línea en blanco antes del cuerpo. No lo pegues al resto del texto.`;
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
