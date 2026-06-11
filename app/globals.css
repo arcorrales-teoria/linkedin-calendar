@@ -1,87 +1,147 @@
 @import "tailwindcss";
 
-/* ── LinkedIn Calendar — LATAM ───────────────────────────────────────────────── */
+/* ── LinkedIn Calendar — LATAM ──────────────────────────────────────────────────
+   Quiet product surface: solid near-black panes, hairline borders, soft buttons
+   with real depth (gradient + inset highlight + crisp shadow). No glow, no glass.
+── */
 
 :root {
   --font-sans: var(--font-geist-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
-  /* ── Text ── */
-  --text-primary:   rgba(20, 18, 40, 0.90);
-  --text-secondary: rgba(20, 18, 40, 0.56);
-  --text-muted:     rgba(20, 18, 40, 0.36);
+  /* ── Radius scale ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
 
-  /* ── Purple accent ── */
-  --accent:      #7c3aed;
-  --accent-rgb:  124, 58, 237;
-  --accent-dim:  rgba(124, 58, 237, 0.14);
+  /* ── Z-index scale ── */
+  --z-bg: 0;
+  --z-base: 10;
+  --z-dropdown: 100;
+  --z-modal-bg: 200;
+  --z-modal: 210;
+  --z-modal-2: 300;
+  --z-modal-3: 500;
+  --z-toast: 600;
+
+  /* ── LIGHT ── */
+  --app-bg:         #edebf2;
+  --text-primary:   rgba(23, 20, 33, 0.95);
+  --text-secondary: rgba(28, 24, 44, 0.70);
+  --text-muted:     rgba(34, 29, 56, 0.50);
+
+  --accent:      #6d28d9;
+  --accent-rgb:  109, 40, 217;
+  --accent-dim:  rgba(109, 40, 217, 0.12);
   --accent-text: #ffffff;
-  --accent-glow: 0 4px 24px rgba(124, 58, 237, 0.42), 0 1px 8px rgba(124, 58, 237, 0.28);
 
-  /* ── Shadows (light) ── */
-  --shadow-btn:    0 2px 8px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06), inset 0 1.5px 0 rgba(255,255,255,0.70);
-  --shadow-card:   0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06), inset 0 1.5px 0 rgba(255,255,255,0.60);
-  --shadow-window: 0 32px 80px rgba(0,0,0,0.20), 0 12px 40px rgba(0,0,0,0.12), inset 0 2px 0 rgba(255,255,255,0.70), 0 0 0 1px rgba(255,255,255,0.30);
-  --shadow-modal:  0 40px 100px rgba(0,0,0,0.22), 0 16px 48px rgba(0,0,0,0.12), inset 0 2px 0 rgba(255,255,255,0.70), inset 0 -1px 0 rgba(255,255,255,0.30);
-  --shadow-dropdown: 0 12px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08), inset 0 1.5px 0 rgba(255,255,255,0.60);
+  --status-success:      #15803d;
+  --status-success-bg:   rgba(21, 128, 61, 0.10);
+  --status-success-line: rgba(21, 128, 61, 0.30);
+  --status-error:        #b91c1c;
+  --status-error-bg:     rgba(185, 28, 28, 0.08);
+  --status-error-line:   rgba(185, 28, 28, 0.30);
 
-  /* ── Calendar surface tokens — LIGHT ──
-     Heavy frost: white-tinted, high opacity, strong blur
-  ── */
-  --cal-window-bg:     rgba(255, 255, 255, 0.45);
-  --cal-titlebar-bg:   rgba(255, 255, 255, 0.38);
-  --cal-toolbar-bg:    rgba(255, 255, 255, 0.32);
-  --cal-section-bg:    rgba(255, 255, 255, 0.26);
-  --cal-header-bg:     rgba(255, 255, 255, 0.30);
-  --cal-statusbar-bg:  rgba(255, 255, 255, 0.32);
-  --cal-cell-bg:       rgba(255, 255, 255, 0.22);
-  --cal-cell-weekend:  rgba(255, 255, 255, 0.10);
-  --cal-cell-today:    rgba(124, 58, 237, 0.13);
-  --cal-cell-hover:    rgba(255, 255, 255, 0.50);
-  --cal-border:        rgba(20, 18, 40, 0.09);
-  --cal-urlbar-bg:     rgba(255, 255, 255, 0.50);
-  --cal-urlbar-border: rgba(20, 18, 40, 0.10);
-  --cal-modal-overlay: rgba(20, 18, 40, 0.32);
+  --linkedin:      #0a66c2;
+  --linkedin-bg:   rgba(10, 102, 194, 0.10);
+  --linkedin-line: rgba(10, 102, 194, 0.40);
+
+  /* Buttons: primary = ink with depth, neutral = white with hairline */
+  --btn-primary-bg:     linear-gradient(180deg, #2e2a3c 0%, #1b1826 100%);
+  --btn-primary-text:   #f7f6fb;
+  --btn-primary-border: rgba(20, 16, 36, 0.85);
+  --shadow-btn-primary: 0 1px 2px rgba(20, 16, 40, 0.35), inset 0 1px 0 rgba(255,255,255,0.14);
+  --btn-bg:             #ffffff;
+  --tab-active-bg:      #ffffff;
+
+  --shadow-btn:      0 1px 2px rgba(22, 18, 44, 0.08), inset 0 1px 0 rgba(255,255,255,0.85);
+  --shadow-card:     0 1px 2px rgba(22, 18, 44, 0.05), 0 0 0 1px rgba(255,255,255,0.55) inset;
+  --shadow-window:   0 24px 64px rgba(20, 16, 44, 0.18), 0 4px 16px rgba(20, 16, 44, 0.08);
+  --shadow-modal:    0 24px 64px rgba(20, 16, 44, 0.22), 0 8px 24px rgba(20, 16, 44, 0.10);
+  --shadow-dropdown: 0 12px 32px rgba(20, 16, 44, 0.14), 0 2px 8px rgba(20, 16, 44, 0.08);
+
+  --cal-window-bg:     #faf9fc;
+  --cal-titlebar-bg:   #f5f4f8;
+  --cal-toolbar-bg:    #f5f4f8;
+  --cal-section-bg:    #faf9fc;
+  --cal-header-bg:     #f5f4f8;
+  --cal-statusbar-bg:  #f5f4f8;
+  --cal-cell-bg:       #fdfdfe;
+  --cal-cell-weekend:  #f4f3f8;
+  --cal-cell-today:    rgba(109, 40, 217, 0.07);
+  --cal-cell-hover:    #f0eef6;
+  --cal-border:        rgba(24, 20, 44, 0.10);
+  --cal-urlbar-bg:     #ffffff;
+  --cal-urlbar-border: rgba(24, 20, 44, 0.12);
+  --cal-modal-overlay: rgba(18, 15, 32, 0.40);
+  --card-bg:           #ffffff;
+  --card-border:       rgba(24, 20, 44, 0.09);
+  --menu-bg:           #ffffff;
+  --modal-bg:          #fcfbfe;
+
+  --scrollbar-thumb:   rgba(24, 20, 44, 0.22);
 }
 
-/* ── DARK MODE ───────────────────────────────────────────────────────────────
-   Use deep purple-tinted glass — NOT pure black.
-   The gradient background (purple/pink/blue) must bleed through.
+/* ── DARK (default theme of the app) ──
+   Reference register: near-black violet-cast panes, faint hairlines,
+   soft off-white primary button. Color lives in content, not chrome.
 ── */
 [data-theme="dark"] {
-  --text-primary:   rgba(238, 235, 255, 0.95);
-  --text-secondary: rgba(200, 196, 230, 0.78);
-  --text-muted:     rgba(160, 156, 200, 0.58);
+  --app-bg:         #08070b;
+  --text-primary:   rgba(243, 241, 250, 0.95);
+  --text-secondary: rgba(202, 198, 220, 0.74);
+  --text-muted:     rgba(170, 165, 196, 0.55);
 
   --accent:      #a78bfa;
   --accent-rgb:  167, 139, 250;
-  --accent-dim:  rgba(167, 139, 250, 0.20);
-  --accent-text: rgba(15, 10, 35, 0.95);
-  --accent-glow: 0 4px 24px rgba(167, 139, 250, 0.42), 0 1px 8px rgba(167, 139, 250, 0.28);
+  --accent-dim:  rgba(167, 139, 250, 0.16);
+  --accent-text: #14101f;
 
-  --shadow-btn:    0 2px 8px rgba(0,0,0,0.40), 0 1px 3px rgba(0,0,0,0.30), inset 0 1.5px 0 rgba(255,255,255,0.12);
-  --shadow-card:   0 8px 32px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.30), inset 0 1.5px 0 rgba(255,255,255,0.10);
-  --shadow-window: 0 32px 80px rgba(0,0,0,0.60), 0 12px 40px rgba(0,0,0,0.40), inset 0 2px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(255,255,255,0.10);
-  --shadow-modal:  0 40px 100px rgba(0,0,0,0.65), 0 16px 48px rgba(0,0,0,0.40), inset 0 2px 0 rgba(255,255,255,0.14), inset 0 -1px 0 rgba(255,255,255,0.06);
-  --shadow-dropdown: 0 12px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.40), inset 0 1.5px 0 rgba(255,255,255,0.10);
+  --status-success:      #4ade80;
+  --status-success-bg:   rgba(74, 222, 128, 0.10);
+  --status-success-line: rgba(74, 222, 128, 0.28);
+  --status-error:        #f87171;
+  --status-error-bg:     rgba(248, 113, 113, 0.10);
+  --status-error-line:   rgba(248, 113, 113, 0.28);
 
-  /* ── Calendar surface tokens — DARK ──
-     High-opacity surfaces — light text must always pass 4.5:1 contrast.
-     Gradient bleeds through only at the window level (backdrop-filter).
-  ── */
-  --cal-window-bg:     rgba(12, 8, 36, 0.90);
-  --cal-titlebar-bg:   rgba(10, 6, 30, 0.88);
-  --cal-toolbar-bg:    rgba(10, 6, 30, 0.85);
-  --cal-section-bg:    rgba(14, 10, 40, 0.82);
-  --cal-header-bg:     rgba(10, 6, 30, 0.85);
-  --cal-statusbar-bg:  rgba(10, 6, 30, 0.88);
-  --cal-cell-bg:       rgba(20, 13, 52, 0.78);
-  --cal-cell-weekend:  rgba(8, 4, 24, 0.85);
-  --cal-cell-today:    rgba(167, 139, 250, 0.22);
-  --cal-cell-hover:    rgba(255, 255, 255, 0.08);
-  --cal-border:        rgba(255, 255, 255, 0.09);
-  --cal-urlbar-bg:     rgba(12, 8, 36, 0.82);
-  --cal-urlbar-border: rgba(255, 255, 255, 0.12);
-  --cal-modal-overlay: rgba(4, 2, 16, 0.72);
+  --linkedin:      #6db3ec;
+  --linkedin-bg:   rgba(109, 179, 236, 0.10);
+  --linkedin-line: rgba(109, 179, 236, 0.32);
+
+  /* Primary = soft off-white (the "Invite member" button), neutral = elevated pane */
+  --btn-primary-bg:     linear-gradient(180deg, #ffffff 0%, #e6e3f0 100%);
+  --btn-primary-text:   #17141f;
+  --btn-primary-border: rgba(255, 255, 255, 0.16);
+  --shadow-btn-primary: 0 1px 2px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255,255,255,0.95);
+  --btn-bg:             #1a1822;
+  --tab-active-bg:      #232030;
+
+  --shadow-btn:      0 1px 2px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+  --shadow-card:     0 1px 2px rgba(0,0,0,0.35);
+  --shadow-window:   0 32px 80px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-modal:    0 32px 80px rgba(0,0,0,0.60), 0 8px 24px rgba(0,0,0,0.40);
+  --shadow-dropdown: 0 16px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.40);
+
+  --cal-window-bg:     #0e0d13;
+  --cal-titlebar-bg:   #121016;
+  --cal-toolbar-bg:    #121016;
+  --cal-section-bg:    #0e0d13;
+  --cal-header-bg:     #121016;
+  --cal-statusbar-bg:  #121016;
+  --cal-cell-bg:       #100f15;
+  --cal-cell-weekend:  #0b0a0f;
+  --cal-cell-today:    rgba(167, 139, 250, 0.09);
+  --cal-cell-hover:    #181620;
+  --cal-border:        rgba(255, 255, 255, 0.08);
+  --cal-urlbar-bg:     #16141d;
+  --cal-urlbar-border: rgba(255, 255, 255, 0.10);
+  --cal-modal-overlay: rgba(3, 2, 8, 0.66);
+  --card-bg:           #14121b;
+  --card-border:       rgba(255, 255, 255, 0.07);
+  --menu-bg:           #1b1924;
+  --modal-bg:          #16141d;
+
+  --scrollbar-thumb:   rgba(255, 255, 255, 0.20);
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────────── */
@@ -98,81 +158,50 @@ body {
   height: 100%;
   font-family: var(--font-sans);
   color: var(--text-primary);
-  background-image: url('/images/gradient-background.jpg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-
-/* Dark: deep-purple overlay to kill gradient bleed behind the calendar */
-[data-theme="dark"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(6, 3, 20, 0.62);
-  pointer-events: none;
-  z-index: 0;
+  background: var(--app-bg);
 }
 
 ::selection { background: var(--accent); color: var(--accent-text); }
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.30); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 
-/* ── Heavy frost glass utilities ─────────────────────────────────────────────── */
+/* Keyboard focus is always visible. Elements that paint their own ring
+   (inputs with the accent box-shadow) set outline:none inline. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
-/* Standard frosted panel */
+/* ── Surface utilities (solid — no backdrop blur) ────────────────────────────── */
+
 .glass {
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  background: rgba(255, 255, 255, 0.24);
-  border: 1px solid rgba(255, 255, 255, 0.40);
-  box-shadow: var(--shadow-card);
+  background: var(--menu-bg);
+  border: 1px solid var(--cal-border);
+  box-shadow: var(--shadow-dropdown);
 }
 
-[data-theme="dark"] .glass {
-  background: rgba(30, 20, 65, 0.50);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-/* Heavy frosted — window-level blur */
 .glass-strong {
-  backdrop-filter: blur(80px) saturate(250%);
-  -webkit-backdrop-filter: blur(80px) saturate(250%);
-  background: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.50);
-  box-shadow: var(--shadow-window);
-}
-
-[data-theme="dark"] .glass-strong {
-  background: rgba(18, 12, 48, 0.62);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--modal-bg);
+  border: 1px solid var(--cal-border);
+  box-shadow: var(--shadow-modal);
 }
 
 .hover-lift {
-  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 240ms cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 160ms ease;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 140ms ease;
 }
-.hover-lift:hover { transform: translateY(-2px); }
+.hover-lift:hover { transform: translateY(-1px); }
 
-.ripple-effect { position: relative; overflow: hidden; }
-.ripple-effect::after {
-  content: "";
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle at center, rgba(255,255,255,0.35) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 400ms ease;
-  pointer-events: none;
-}
-.ripple-effect:active::after { opacity: 1; transition: opacity 0ms; }
+/* Press feedback: a quiet settle, not a flash */
+.ripple-effect { position: relative; }
+.ripple-effect:active { transform: translateY(0) scale(0.985); }
 
 /* ── Keyframes ───────────────────────────────────────────────────────────────── */
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes fadeIn {
@@ -183,25 +212,21 @@ body {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  33%       { transform: translateY(-16px) rotate(2deg); }
-  66%       { transform: translateY(-8px) rotate(-1deg); }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(110%); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes floatAlt {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%       { transform: translateY(-20px) rotate(-3deg); }
-}
-
-.animate-slide-up { animation: slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-fade-in  { animation: fadeIn  180ms ease-out both; }
-.animate-backdrop { animation: backdropIn 200ms ease-out both; }
-
-/* ── Reduced motion ──────────────────────────────────────────────────────────── */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+.animate-slide-up { animation: slideUp 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-in  { animation: fadeIn  140ms ease-out both; }
+.animate-backdrop { animation: backdropIn 180ms ease-out both; }
+.animate-toast-in { animation: toastIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
@@ -212,25 +237,6 @@ body {
   filter: invert(1) opacity(0.6);
 }
 [data-theme="dark"] select option {
-  background: #120c30;
-  color: rgba(238, 235, 255, 0.92);
-}
-
-/* ── Dark mode: override all hardcoded white-tinted rgba backgrounds ── */
-[data-theme="dark"] .post-input {
-  background: rgba(30, 20, 70, 0.65) !important;
-  color: rgba(238, 235, 255, 0.95) !important;
-}
-[data-theme="dark"] .post-panel {
-  background: rgba(14, 8, 40, 0.88) !important;
-  border-color: rgba(255, 255, 255, 0.10) !important;
-}
-
-/* Dark-mode surface override for elements with hardcoded white-tinted backgrounds */
-[data-theme="dark"] .dm-surface {
-  background: rgba(20, 12, 52, 0.85) !important;
-  border-color: rgba(255, 255, 255, 0.10) !important;
-}
-[data-theme="dark"] .dm-surface-subtle {
-  background: rgba(14, 8, 42, 0.70) !important;
+  background: #16141d;
+  color: rgba(243, 241, 250, 0.92);
 }

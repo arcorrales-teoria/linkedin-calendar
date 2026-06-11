@@ -1,4 +1,36 @@
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+
+function normalize(str: string) {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "");
+}
+
+function findProfileFile(personName: string): string | null {
+  const dir = path.join(process.cwd(), "tone_profiles");
+  if (!fs.existsSync(dir)) return null;
+
+  const files = fs.readdirSync(dir).filter(
+    (f) => f.endsWith(".md") && f !== "README.md" && f !== "TEMPLATE.md"
+  );
+
+  const nameParts = normalize(personName)
+    .split(/\s+/)
+    .filter((p) => p.length > 2);
+  if (nameParts.length === 0) return null;
+
+  for (const file of files) {
+    const fileNorm = normalize(file);
+    if (nameParts.every((part) => fileNorm.includes(part))) {
+      return path.join(dir, file);
+    }
+  }
+  return null;
+}
 
 const SYSTEM_PROMPT = `🔹 PROMPT CONTEXTO – EDITOR DE CONTENIDO (ESTILO TRUORA)
 Actúa como un editor de claridad, no como un copywriter que reescribe todo. Tu trabajo es mejorar gramática, ortografía, puntuación y fluidez, manteniendo exactamente el mismo estilo, voz, tono e intención del texto original.
@@ -140,7 +172,7 @@ NUNCA uses "—" (guión largo) en el contenido. Usa comas y puntos seguidos cua
 
 export async function POST(request: Request) {
   try {
-    const { topic, tone, focus, length, profile, language } = await request.json();
+    const { topic, tone, focus, length, profile, language, personName } = await request.json();
 
     if (!topic?.trim()) {
       return NextResponse.json({ ok: false, error: "No topic provided" }, { status: 400 });
@@ -156,8 +188,27 @@ export async function POST(request: Request) {
       : length?.startsWith("Largo") ? "Largo (5+ párrafos)."
       : "Medio (3-4 párrafos).";
 
-    const profileContext = profile
-      ? `\nPerfil de tono: ${profile.name}. Estilo: ${profile.writingStyle}. ${profile.bio ?? ""}`
+    // Perfil de tono documentado en tone_profiles/ — manda sobre el parámetro "Tono"
+    let toneProfileSection = "";
+    if (personName) {
+      const profilePath = findProfileFile(personName);
+      if (profilePath) {
+        const md = fs.readFileSync(profilePath, "utf8").slice(0, 9000);
+        toneProfileSection = `
+
+PERFIL DE TONO PERSONAL — ${personName}
+El post lo firma esta persona y debe sonar exactamente como ella, no como una marca.
+Este perfil tiene prioridad sobre el parámetro "Tono". Imita su estructura de post, vocabulario,
+muletillas, uso de emojis, hashtags y listas, y su longitud promedio. Usa los posts de referencia
+incluidos como ejemplos de su voz real:
+---
+${md}
+---`;
+      }
+    }
+
+    const profileContext = !toneProfileSection && profile
+      ? `\nPerfil de tono: ${profile.personName ?? ""}. Estilo: ${profile.writingStyle ?? ""}.`
       : "";
 
     const userMessage = `Genera un post de LinkedIn sobre el siguiente tema o contenido:
@@ -168,7 +219,7 @@ Parámetros:
 - Tono: ${tone ?? "Profesional"}
 - Enfoque: ${focus ?? "Reconocimiento de marca"}
 - Longitud: ${lengthHint}
-- Idioma: ${language ?? "Español"}${profileContext}
+- Idioma: ${language ?? "Español"}${profileContext}${toneProfileSection}
 
 Entrega solo el post final, listo para publicar. Sin explicaciones ni comentarios adicionales.
 

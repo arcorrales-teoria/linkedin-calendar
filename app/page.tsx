@@ -87,6 +87,23 @@ function saveToneProfile(profile: ToneProfile) {
   try { localStorage.setItem(`tone_${profile.personName}`, JSON.stringify(profile)); } catch {}
 }
 
+function normName(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s-]/g, "");
+}
+
+function fileMatchesPerson(file: string, person: string) {
+  const fn = normName(file);
+  const parts = normName(person).split(/\s+/).filter(p => p.length > 2);
+  return parts.length > 0 && parts.every(p => fn.includes(p));
+}
+
+function samePerson(a: string, b: string) {
+  const pa = normName(a).split(/\s+/).filter(w => w.length > 1);
+  const pb = normName(b).split(/\s+/).filter(w => w.length > 1);
+  if (pa.length === 0 || pb.length === 0) return false;
+  return pa.every(w => pb.includes(w)) || pb.every(w => pa.includes(w));
+}
+
 function analyzeTone(sampleText: string, personName: string, linkedinUrl: string): ToneProfile {
   const posts = sampleText.split(/\n?---+\n?/).filter(p => p.trim().length > 30);
   const full  = sampleText.toLowerCase();
@@ -288,12 +305,6 @@ function layoutWeekEvents(events: Array<{pub:Publication; startCol:number; endCo
   return rows;
 }
 
-
-function generatePost(pub: Publication): string {
-  const cn = pub.country === "LATAM" ? "LATAM" : CMAP[pub.country].label;
-  return `🚀 ${pub.title}\n\n[Escribe aquí tu insight principal...]\n\n¿Por qué importa esto para ${cn}?\n• [Punto clave 1]\n• [Punto clave 2]\n• [Punto clave 3]\n\n¿Cuál es tu perspectiva? Comparte en los comentarios 👇${pub.people.length ? `\n\nPor: ${pub.people.join(", ")}` : ""}\n\n#LinkedIn #${cn.replace(/\s/g,"")} #MarketingDigital #Contenido`;
-}
-
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
 const SEED: Publication[] = [
@@ -329,6 +340,8 @@ function PersonBadge({ name, size = 24 }: { name: string; size?: number }) {
   return (
     <span
       title={name}
+      role="img"
+      aria-label={name}
       style={{
         display:"inline-flex", alignItems:"center", justifyContent:"center",
         width:size, height:size, borderRadius:"50%",
@@ -346,122 +359,20 @@ function PersonBadge({ name, size = 24 }: { name: string; size?: number }) {
   );
 }
 
-// ── EventChip ─────────────────────────────────────────────────────────────────
+// ── IconTile — rounded-square tile with a thin-stroke icon ───────────────────
 
-function EventChip({ pub, role, dark, onClick }: {
-  pub: Publication; role: EventRole; dark: boolean; onClick: () => void;
-}) {
-  const c = CMAP[pub.country];
-  const bg = dark ? c.bgDark : c.bgLight;
-  const fg = dark ? c.colorDark : c.color;
-  const isStart = role === "single" || role === "start";
-
-  if (!isStart) {
-    // Continuation bar: glass-tinted, same color family
-    return (
-      <button
-        type="button"
-        onClick={e => { e.stopPropagation(); onClick(); }}
-        aria-label={`${pub.title} (continued)`}
-        style={{
-          display:"flex", alignItems:"center", justifyContent:"flex-end",
-          width:"100%", height:20, marginBottom:2, paddingRight:4,
-          cursor:"pointer", overflow:"hidden",
-          background:bg,
-          border:"none",
-          borderTop:`1px solid rgba(255,255,255,0.22)`,
-          borderBottom:`1px solid rgba(0,0,0,0.06)`,
-          borderRadius: role === "end" ? "0 5px 5px 0" : 0,
-          boxShadow:"0 2px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.28)",
-          transition:"opacity 120ms, transform 200ms",
-        }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.opacity = "0.82";
-          el.style.transform = "translateY(-1px)";
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement;
-          el.style.opacity = "1";
-          el.style.transform = "translateY(0)";
-        }}
-      >
-        {role === "end" && (
-          <span style={{ fontSize:10, opacity:0.7 }}>{c.flag}</span>
-        )}
-      </button>
-    );
-  }
-
+function IconTile({ children, size = 38 }: { children: React.ReactNode; size?: number }) {
   return (
-    <button
-      type="button"
-      onClick={e => { e.stopPropagation(); onClick(); }}
-      title={pub.title}
-      style={{
-        position:"relative",
-        width:"100%", height:20, marginBottom:2, padding:0,
-        borderRadius: role === "single" ? 6 : "6px 0 0 6px",
-        border:`1px solid rgba(255,255,255,0.30)`,
-        borderBottom:`1px solid rgba(0,0,0,0.08)`,
-        background:bg, color:fg,
-        cursor:"pointer", fontSize:11,
-        fontFamily:"var(--font-sans)", fontWeight:600,
-        overflow:"hidden", whiteSpace:"nowrap",
-        flexShrink:0,
-        boxShadow:[
-          "0 4px 12px rgba(0,0,0,0.18)",
-          "0 1px 4px rgba(0,0,0,0.12)",
-          "inset 0 1.5px 0 rgba(255,255,255,0.55)",
-          "inset 0 -1px 0 rgba(0,0,0,0.08)",
-        ].join(", "),
-        transition:"opacity 120ms, transform 200ms, box-shadow 200ms",
-      }}
-      onMouseEnter={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.opacity = "0.88";
-        el.style.transform = "translateY(-2px)";
-        el.style.boxShadow = [
-          "0 8px 20px rgba(0,0,0,0.22)",
-          "0 2px 6px rgba(0,0,0,0.14)",
-          "inset 0 1.5px 0 rgba(255,255,255,0.60)",
-          "inset 0 -1px 0 rgba(0,0,0,0.08)",
-        ].join(", ");
-      }}
-      onMouseLeave={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.opacity = "1";
-        el.style.transform = "translateY(0)";
-        el.style.boxShadow = [
-          "0 4px 12px rgba(0,0,0,0.18)",
-          "0 1px 4px rgba(0,0,0,0.12)",
-          "inset 0 1.5px 0 rgba(255,255,255,0.55)",
-          "inset 0 -1px 0 rgba(0,0,0,0.08)",
-        ].join(", ");
-      }}
-    >
-      {/* Title absolutely centered across the full chip width */}
-      <span style={{
-        position:"absolute", left:0, right:0, top:0, bottom:0,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        overflow:"hidden", paddingLeft:24, paddingRight:24,
-        pointerEvents:"none",
-      }}>
-        <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"100%", textAlign:"center" }}>
-          {pub.title}
-        </span>
-      </span>
-      {/* Flag — left edge */}
-      <span style={{ position:"absolute", left:5, top:0, bottom:0, display:"flex", alignItems:"center", fontSize:12 }}>{c.flag}</span>
-      {/* People badges — right edge */}
-      <span style={{ position:"absolute", right:4, top:0, bottom:0, display:"flex", alignItems:"center", gap:0 }}>
-        {pub.people.slice(0,2).map((p,i) => (
-        <span key={i} style={{ marginLeft: i===0?0:-4 }}>
-          <PersonBadge name={p} size={16} />
-        </span>
-      ))}
-      </span>
-    </button>
+    <span aria-hidden="true" style={{
+      width:size, height:size, borderRadius:10, flexShrink:0,
+      background:"var(--btn-bg)",
+      border:"1px solid var(--cal-border)",
+      display:"inline-flex", alignItems:"center", justifyContent:"center",
+      color:"var(--text-secondary)",
+      boxShadow:"var(--shadow-btn)",
+    }}>
+      {children}
+    </span>
   );
 }
 
@@ -496,23 +407,21 @@ function GlassBtn({
         height: small ? 32 : 36,
         padding: small ? "0 12px" : "0 16px",
         borderRadius:10,
-        border: accent ? "1px solid rgba(255,255,255,0.28)" : "1px solid var(--cal-border)",
-        background: accent
-          ? "var(--accent)"
-          : "var(--cal-cell-hover)",
-        color: accent ? "var(--accent-text)" : disabled ? "var(--text-muted)" : "var(--text-primary)",
-        boxShadow: accent ? "var(--accent-glow), var(--shadow-btn)" : "var(--shadow-btn)",
+        border: accent ? "1px solid var(--btn-primary-border)" : "1px solid var(--cal-border)",
+        background: accent ? "var(--btn-primary-bg)" : "var(--btn-bg)",
+        color: accent ? "var(--btn-primary-text)" : disabled ? "var(--text-muted)" : "var(--text-primary)",
+        boxShadow: accent ? "var(--shadow-btn-primary)" : "var(--shadow-btn)",
         cursor: disabled ? "not-allowed" : "pointer",
         fontSize: small ? 13 : 14,
         fontFamily:"var(--font-sans)",
         fontWeight: accent ? 700 : 600,
         letterSpacing:"-0.01em",
-        opacity: disabled ? 0.45 : 1,
+        opacity: disabled ? 0.5 : 1,
         flexShrink:0,
         transition:"opacity 160ms, transform 240ms, box-shadow 240ms",
       }}
       onMouseEnter={e => {
-        if (!disabled) (e.currentTarget as HTMLElement).style.opacity = "0.82";
+        if (!disabled) (e.currentTarget as HTMLElement).style.opacity = "0.9";
       }}
       onMouseLeave={e => {
         (e.currentTarget as HTMLElement).style.opacity = "1";
@@ -538,7 +447,7 @@ function CountryDropdown({ selected, onChange }: { selected: CountryKey; onChang
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label={`Filter by country: ${c.label}`}
+        aria-label={`Filtrar por país: ${c.label}`}
       >
         <span style={{ fontSize:16 }}>{c.flag}</span>
         <span style={{ fontWeight:600 }}>{c.label}</span>
@@ -550,13 +459,11 @@ function CountryDropdown({ selected, onChange }: { selected: CountryKey; onChang
       {open && (
         <div
           role="listbox"
-          aria-label="Select country"
+          aria-label="Seleccionar país"
           className="animate-fade-in glass"
           style={{
             position:"absolute", top:"calc(100% + 8px)", right:0,
-            borderRadius:14, padding:5, zIndex:100, minWidth:170,
-            backdropFilter:"blur(30px) saturate(200%)",
-            WebkitBackdropFilter:"blur(30px) saturate(200%)",
+            borderRadius:12, padding:5, zIndex:100, minWidth:170,
             boxShadow:"var(--shadow-dropdown)",
           }}
         >
@@ -621,7 +528,7 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
 
   const inputStyle: React.CSSProperties = {
     width:"100%", padding:"10px 14px", borderRadius:10,
-    border:"1.5px solid var(--cal-border)",
+    border:"1px solid var(--cal-border)",
     background:"var(--cal-cell-bg)",
     color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)",
     outline:"none", transition:"border-color 180ms, box-shadow 180ms",
@@ -641,7 +548,7 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
               boxShadow:"0 1px 4px rgba(0,0,0,0.08)",
             }}>
               {p}
-              <button type="button" aria-label={`Remove ${p}`}
+              <button type="button" aria-label={`Quitar a ${p}`}
                 onClick={() => onChange(people.filter(x => x !== p))}
                 style={{ background:"none", border:"none", cursor:"pointer", color:"var(--text-muted)", fontSize:15, lineHeight:1, padding:0, display:"flex", alignItems:"center" }}>
                 ×
@@ -652,7 +559,7 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
       )}
 
       <label htmlFor={inputId} style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0,0,0,0)" }}>
-        Search or add people
+        Buscar o añadir personas
       </label>
       <input
         id={inputId}
@@ -684,18 +591,16 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
         <div className="animate-fade-in" style={{
           position:"absolute", top:"calc(100% + 5px)", left:0, right:0,
           borderRadius:12, zIndex:300, overflow:"hidden",
-          background:"var(--cal-window-bg)",
-          border:"1.5px solid var(--cal-border)",
-          backdropFilter:"blur(40px) saturate(180%)",
-          WebkitBackdropFilter:"blur(40px) saturate(180%)",
-          boxShadow:"0 8px 32px rgba(0,0,0,0.22)",
+          background:"var(--menu-bg)",
+          border:"1px solid var(--cal-border)",
+          boxShadow:"var(--shadow-dropdown)",
         }}>
           <div style={{ maxHeight:200, overflowY:"auto" }}>
             {filtered.length === 0 ? (
               <div style={{ padding:"12px 14px", fontSize:13, color:"var(--text-muted)", fontFamily:"var(--font-sans)" }}>
                 {query.trim()
-                  ? <><span style={{ color:"var(--text-secondary)" }}>"{query.trim()}"</span> — press Enter to add</>
-                  : "No matches"}
+                  ? <><span style={{ color:"var(--text-secondary)" }}>"{query.trim()}"</span> · Enter para añadir</>
+                  : "Sin resultados"}
               </div>
             ) : filtered.map(p => {
               const sel = people.includes(p);
@@ -800,10 +705,10 @@ function DateRangePicker({
       <div style={{
         display:"grid", gridTemplateColumns:"1fr auto 1fr",
         alignItems:"stretch",
-        border:"1.5px solid var(--cal-border)",
+        border:"1px solid var(--cal-border)",
         borderRadius:12, overflow:"hidden",
         background:"var(--cal-cell-bg)",
-        boxShadow:"inset 0 1.5px 0 rgba(255,255,255,0.22)",
+        boxShadow:"none",
       }}>
         <button type="button" onClick={() => openFor("start")} style={{
           padding:"10px 14px", border:"none",
@@ -839,25 +744,23 @@ function DateRangePicker({
         <div className="animate-fade-in" onClick={e => e.stopPropagation()} style={{
           position:"absolute", top:"calc(100% + 8px)", left:0,
           width:288, zIndex:400,
-          borderRadius:16,
-          border:"1.5px solid rgba(255,255,255,0.35)",
-          background:"var(--cal-window-bg)",
-          backdropFilter:"blur(60px) saturate(220%)",
-          WebkitBackdropFilter:"blur(60px) saturate(220%)",
+          borderRadius:12,
+          border:"1px solid var(--cal-border)",
+          background:"var(--menu-bg)",
           boxShadow:"var(--shadow-dropdown)",
           overflow:"hidden",
         }}>
           {/* Month nav */}
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
             padding:"12px 14px 8px", borderBottom:"1px solid var(--cal-border)" }}>
-            <button type="button" onClick={prevCal} style={navBtnSt}
+            <button type="button" onClick={prevCal} aria-label="Mes anterior" style={navBtnSt}
               onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.opacity="0.6";}}
               onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.opacity="1";}}
             >‹</button>
             <span style={{ fontSize:13, fontWeight:700, color:"var(--text-primary)", fontFamily:"var(--font-sans)" }}>
               {MONTHS_FULL[calMonth]} {calYear}
             </span>
-            <button type="button" onClick={nextCal} style={navBtnSt}
+            <button type="button" onClick={nextCal} aria-label="Mes siguiente" style={navBtnSt}
               onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.opacity="0.6";}}
               onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.opacity="1";}}
             >›</button>
@@ -865,7 +768,7 @@ function DateRangePicker({
 
           {/* Day labels */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", padding:"8px 10px 2px" }}>
-            {["S","M","T","W","T","F","S"].map((d,i) => (
+            {["D","L","M","M","J","V","S"].map((d,i) => (
               <div key={i} style={{ textAlign:"center", fontSize:10, fontWeight:700,
                 color:"var(--text-muted)", letterSpacing:"0.06em" }}>{d}</div>
             ))}
@@ -905,7 +808,7 @@ function DateRangePicker({
                           fontWeight: isSel ? 700 : 400, borderRadius:radius,
                           background: isSel ? "var(--accent)" : isHov ? "var(--cal-cell-hover)" : "transparent",
                           color: isSel ? "var(--accent-text)" : inMonth(day) ? "var(--text-primary)" : "var(--text-muted)",
-                          opacity: inMonth(day) ? 1 : 0.35,
+                          opacity: inMonth(day) ? 1 : 0.55,
                           transition:"background 80ms",
                           display:"flex", alignItems:"center", justifyContent:"center",
                         }}
@@ -957,6 +860,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
   const [country, setCountry] = useState<CountryKey>(existing?.country ?? "LATAM");
   const [people,  setPeople]  = useState<string[]>(existing?.people ?? []);
   const [copied,  setCopied]  = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   const c = CMAP[country];
 
@@ -980,7 +884,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
   const inputStyle: React.CSSProperties = {
     width:"100%", padding:"10px 14px", borderRadius:10,
-    border:"1.5px solid var(--cal-border)",
+    border:"1px solid var(--cal-border)",
     background:"var(--cal-cell-bg)",
     color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)",
     outline:"none", transition:"border-color 180ms, box-shadow 180ms",
@@ -995,7 +899,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
   const onFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     (e.target as HTMLElement).style.borderColor = "var(--accent)";
-    (e.target as HTMLElement).style.boxShadow = "0 0 0 3px rgba(124,58,237,0.22)";
+    (e.target as HTMLElement).style.boxShadow = "0 0 0 3px rgba(var(--accent-rgb),0.22)";
   };
   const onBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     (e.target as HTMLElement).style.borderColor = "var(--cal-border)";
@@ -1008,21 +912,19 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
       background:"var(--cal-modal-overlay)",
       display:"flex", alignItems:"center", justifyContent:"center",
       padding:20,
-      backdropFilter:"blur(14px)",
-      WebkitBackdropFilter:"blur(14px)",
+      backdropFilter:"blur(8px)",
+      WebkitBackdropFilter:"blur(8px)",
     }}>
       <div
         role="dialog" aria-modal="true"
-        aria-label={isCreate ? "New publication" : isEdit ? "Edit publication" : existing?.title}
+        aria-label={isCreate ? "Nueva publicación" : isEdit ? "Editar publicación" : existing?.title}
         className="animate-slide-up"
         onClick={e => e.stopPropagation()}
         style={{
           width:"100%", maxWidth:500,
-          borderRadius:22,
-          border:"1.5px solid rgba(255,255,255,0.40)",
-          background:"var(--cal-window-bg)",
-          backdropFilter:"blur(80px) saturate(250%)",
-          WebkitBackdropFilter:"blur(80px) saturate(250%)",
+          borderRadius:20,
+          border:"1px solid var(--cal-border)",
+          background:"var(--modal-bg)",
           boxShadow:"var(--shadow-modal)",
           overflow:"hidden",
         }}
@@ -1062,17 +964,24 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                 )}
               </>
             ) : (
-              <h2 style={{ fontSize:16, fontWeight:700, letterSpacing:"-0.01em", color:"var(--text-primary)" }}>
-                {isCreate ? "Nueva publicación" : "Editar publicación"}
-              </h2>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <IconTile size={34}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 10h18M8 2v4M16 2v4M12 13.5v5M9.5 16h5"/>
+                  </svg>
+                </IconTile>
+                <h2 style={{ fontSize:16, fontWeight:700, letterSpacing:"-0.01em", color:"var(--text-primary)" }}>
+                  {isCreate ? "Nueva publicación" : "Editar publicación"}
+                </h2>
+              </div>
             )}
           </div>
 
-          <button type="button" onClick={onClose} aria-label="Close"
+          <button type="button" onClick={onClose} aria-label="Cerrar"
             className="hover-lift"
             style={{
               display:"flex", alignItems:"center", justifyContent:"center",
-              width:32, height:32, borderRadius:9,
+              width:32, height:32, borderRadius:8,
               background:"var(--cal-cell-bg)",
               border:"1px solid var(--cal-border)",
               color:"var(--text-muted)", cursor:"pointer", fontSize:16, lineHeight:1,
@@ -1101,22 +1010,22 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
               <div>
-                <label htmlFor="pub-title" style={labelStyle}>Title</label>
+                <label htmlFor="pub-title" style={labelStyle}>Título</label>
                 <input id="pub-title" style={inputStyle} value={title}
-                  onChange={e => setTitle(e.target.value)} placeholder="Post title…"
+                  onChange={e => setTitle(e.target.value)} placeholder="Título del post…"
                   autoFocus onFocus={onFocus} onBlur={onBlur} />
               </div>
 
               <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:12, alignItems:"end" }}>
                 <div>
-                  <label style={labelStyle}>Date range</label>
+                  <label style={labelStyle}>Fechas</label>
                   <DateRangePicker
                     startDate={sDate} endDate={eDate}
                     onChangeStart={setSDate} onChangeEnd={setEDate}
                   />
                 </div>
                 <div>
-                  <label htmlFor="pub-country" style={labelStyle}>Country</label>
+                  <label htmlFor="pub-country" style={labelStyle}>País</label>
                   <select id="pub-country" style={{ ...inputStyle, cursor:"pointer", minWidth:130 }} value={country}
                     onChange={e => setCountry(e.target.value as CountryKey)}
                     onFocus={onFocus} onBlur={onBlur}>
@@ -1128,16 +1037,16 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
               </div>
 
               <div>
-                <label style={labelStyle}>People</label>
+                <label style={labelStyle}>Personas</label>
                 <PeopleInput people={people} onChange={setPeople} />
               </div>
 
               <div>
-                <label htmlFor="pub-content" style={labelStyle}>LinkedIn content</label>
+                <label htmlFor="pub-content" style={labelStyle}>Contenido de LinkedIn</label>
                 <textarea id="pub-content"
                   style={{ ...inputStyle, minHeight:100, resize:"vertical", lineHeight:1.65 }}
                   value={content} onChange={e => setContent(e.target.value)}
-                  placeholder="Write your LinkedIn post here…" onFocus={onFocus} onBlur={onBlur} />
+                  placeholder="Escribe aquí tu post de LinkedIn…" onFocus={onFocus} onBlur={onBlur} />
               </div>
             </div>
           )}
@@ -1157,7 +1066,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                     color:"#fff", fontSize:14, fontFamily:"var(--font-sans)", fontWeight:700,
                     display:"flex", alignItems:"center", justifyContent:"center", gap:8,
                     cursor:"pointer",
-                    boxShadow:"0 4px 18px rgba(10,102,194,0.40), inset 0 1.5px 0 rgba(255,255,255,0.22)",
+                    boxShadow:"0 1px 2px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
                     transition:"opacity 150ms, transform 240ms",
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
@@ -1174,7 +1083,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                   className="ripple-effect hover-lift"
                   style={{
                     flex:1, height:42, borderRadius:12,
-                    border:"1.5px solid var(--cal-border)",
+                    border:"1px solid var(--cal-border)",
                     background:"var(--cal-cell-bg)",
                     color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)", fontWeight:600,
                     display:"flex", alignItems:"center", justifyContent:"center", gap:7,
@@ -1189,24 +1098,27 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
               </div>
 
               <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-                <button type="button" onClick={() => onDelete(existing!.id)}
+                <button type="button"
+                  onClick={() => { if (confirmDel) onDelete(existing!.id); else setConfirmDel(true); }}
                   className="ripple-effect"
+                  aria-label={confirmDel ? "Confirmar eliminación" : `Eliminar publicación ${existing?.title ?? ""}`}
                   style={{
-                    padding:"7px 14px", borderRadius:9, fontSize:13, fontFamily:"var(--font-sans)", fontWeight:500, cursor:"pointer",
-                    border:"1px solid rgba(239,68,68,0.30)", background:"rgba(239,68,68,0.10)",
-                    color:"#dc2626",
-                    transition:"opacity 150ms",
+                    padding:"7px 14px", borderRadius:8, fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600, cursor:"pointer",
+                    border:"1px solid var(--status-error-line)",
+                    background: confirmDel ? "var(--status-error)" : "var(--status-error-bg)",
+                    color: confirmDel ? "#fff" : "var(--status-error)",
+                    transition:"opacity 150ms, background 150ms",
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.78"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
                 >
-                  Eliminar
+                  {confirmDel ? "¿Confirmar eliminación?" : "Eliminar"}
                 </button>
                 <button type="button" onClick={() => onEdit(existing!)}
                   className="ripple-effect hover-lift"
                   style={{
-                    padding:"7px 16px", borderRadius:9, fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600, cursor:"pointer",
-                    border:"1.5px solid var(--cal-border)", background:"var(--cal-cell-bg)",
+                    padding:"7px 16px", borderRadius:8, fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600, cursor:"pointer",
+                    border:"1px solid var(--cal-border)", background:"var(--cal-cell-bg)",
                     color:"var(--text-primary)",
                     boxShadow:"var(--shadow-btn)", transition:"opacity 150ms, transform 240ms",
                   }}
@@ -1220,16 +1132,19 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
           ) : (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
               {isEdit && existing ? (
-                <button type="button" onClick={() => { onDelete(existing.id); onClose(); }}
+                <button type="button"
+                  onClick={() => { if (confirmDel) { onDelete(existing.id); onClose(); } else setConfirmDel(true); }}
                   className="ripple-effect"
+                  aria-label={confirmDel ? "Confirmar eliminación" : `Eliminar publicación ${existing.title}`}
                   style={{
                     padding:"0 16px", height:36, borderRadius:10,
-                    fontSize:13, fontFamily:"var(--font-sans)", fontWeight:500, cursor:"pointer",
-                    border:"1px solid rgba(239,68,68,0.30)", background:"rgba(239,68,68,0.10)",
-                    color:"#dc2626",
+                    fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600, cursor:"pointer",
+                    border:"1px solid var(--status-error-line)",
+                    background: confirmDel ? "var(--status-error)" : "var(--status-error-bg)",
+                    color: confirmDel ? "#fff" : "var(--status-error)",
                   }}
                 >
-                  Eliminar
+                  {confirmDel ? "¿Confirmar eliminación?" : "Eliminar"}
                 </button>
               ) : <div />}
 
@@ -1249,19 +1164,27 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
 // ── ToneAdapterModal ──────────────────────────────────────────────────────────
 
-function ToneAdapterModal({ onClose, initialPerson }: {
-  onClose: () => void; initialPerson?: string;
+function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
+  onClose: () => void; initialPerson?: string; people?: string[];
 }) {
   const [person,  setPerson]  = useState(initialPerson ?? "");
+  const [newName, setNewName] = useState("");
   const [url,     setUrl]     = useState("");
   const [sample,  setSample]  = useState("");
   const [saved,   setSaved]   = useState<ToneProfile | null>(null);
   const [status,  setStatus]  = useState<"idle"|"analyzing"|"done">("idle");
+  const [cloud,   setCloud]   = useState<{ supabase: boolean; fileName: string } | null>(null);
+
+  const effectiveName = person === "__new__" ? newName.trim() : person.trim();
 
   useEffect(() => {
+    if (person === "__new__") {
+      setSaved(null); setCloud(null); setUrl(""); setSample("");
+      return;
+    }
     if (person) {
       const p = loadToneProfile(person);
-      setSaved(p);
+      setSaved(p); setCloud(null);
       if (p) { setUrl(p.linkedinUrl); setSample(p.sampleText); }
       else   { setUrl(""); setSample(""); }
     }
@@ -1273,27 +1196,36 @@ function ToneAdapterModal({ onClose, initialPerson }: {
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
-  function handleAnalyze() {
-    if (!person.trim() || sample.trim().length < 30) return;
+  async function handleAnalyze() {
+    if (!effectiveName || sample.trim().length < 30) return;
     setStatus("analyzing");
-    setTimeout(() => {
-      const profile = analyzeTone(sample, person.trim(), url.trim());
-      saveToneProfile(profile);
-      setSaved(profile);
-      setStatus("done");
-    }, 900);
+    const profile = analyzeTone(sample, effectiveName, url.trim());
+    saveToneProfile(profile);
+    try {
+      const res = await fetch("/api/tone-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      const data = await res.json();
+      setCloud(data.ok ? { supabase: !!data.supabase, fileName: data.fileName ?? "" } : { supabase: false, fileName: "" });
+    } catch {
+      setCloud({ supabase: false, fileName: "" });
+    }
+    setSaved(profile);
+    setStatus("done");
   }
 
   const inputSt: React.CSSProperties = {
     width:"100%", padding:"10px 14px", borderRadius:10,
-    border:"1.5px solid var(--cal-border)", background:"var(--cal-cell-bg)",
+    border:"1px solid var(--cal-border)", background:"var(--cal-cell-bg)",
     color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)",
     outline:"none", transition:"border-color 180ms, box-shadow 180ms",
   };
   const labelSt: React.CSSProperties = {
     display:"block", marginBottom:6, fontSize:12,
     fontFamily:"var(--font-sans)", fontWeight:600,
-    letterSpacing:"0.06em", textTransform:"uppercase", color:"var(--text-secondary)",
+    letterSpacing:"0.01em", color:"var(--text-secondary)",
   };
   const onFocus = (e: React.FocusEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) => {
     (e.target as HTMLElement).style.borderColor = "var(--accent)";
@@ -1314,14 +1246,12 @@ function ToneAdapterModal({ onClose, initialPerson }: {
       position:"fixed", inset:0, zIndex:300,
       background:"var(--cal-modal-overlay)",
       display:"flex", alignItems:"center", justifyContent:"center",
-      padding:20, backdropFilter:"blur(14px)", WebkitBackdropFilter:"blur(14px)",
+      padding:20, backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)",
     }}>
-      <div className="animate-slide-up" onClick={e=>e.stopPropagation()} style={{
+      <div className="animate-slide-up" role="dialog" aria-modal="true" aria-labelledby="tone-modal-title" onClick={e=>e.stopPropagation()} style={{
         width:"100%", maxWidth:520,
-        borderRadius:22, border:"1.5px solid rgba(255,255,255,0.40)",
-        background:"var(--cal-window-bg)",
-        backdropFilter:"blur(80px) saturate(250%)",
-        WebkitBackdropFilter:"blur(80px) saturate(250%)",
+        borderRadius:20, border:"1px solid var(--cal-border)",
+        background:"var(--modal-bg)",
         boxShadow:"var(--shadow-modal)", overflow:"hidden",
       }}>
         {/* accent bar */}
@@ -1329,16 +1259,23 @@ function ToneAdapterModal({ onClose, initialPerson }: {
 
         {/* header */}
         <div style={{ padding:"20px 24px 0", display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
-          <div>
-            <h2 style={{ fontSize:17, fontWeight:700, letterSpacing:"-0.01em", color:"var(--text-primary)" }}>
-              Adaptar tono de escritura
-            </h2>
-            <p style={{ fontSize:13, color:"var(--text-secondary)", marginTop:4, lineHeight:1.5 }}>
-              Pega posts reales de LinkedIn para que el generador aprenda tu estilo.
-            </p>
+          <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+            <IconTile>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/>
+              </svg>
+            </IconTile>
+            <div>
+              <h2 id="tone-modal-title" style={{ fontSize:17, fontWeight:700, letterSpacing:"-0.01em", color:"var(--text-primary)" }}>
+                Adaptar tono de escritura
+              </h2>
+              <p style={{ fontSize:13, color:"var(--text-secondary)", marginTop:4, lineHeight:1.5 }}>
+                Pega posts reales de LinkedIn para que el generador aprenda tu estilo.
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} style={{
-            width:32, height:32, borderRadius:9, border:"1px solid var(--cal-border)",
+          <button type="button" onClick={onClose} aria-label="Cerrar" style={{
+            width:32, height:32, borderRadius:8, border:"1px solid var(--cal-border)",
             background:"var(--cal-cell-bg)", color:"var(--text-muted)",
             cursor:"pointer", fontSize:16, display:"flex", alignItems:"center", justifyContent:"center",
             flexShrink:0,
@@ -1352,9 +1289,21 @@ function ToneAdapterModal({ onClose, initialPerson }: {
             <label style={labelSt}>Persona</label>
             <select style={{ ...inputSt, cursor:"pointer" }} value={person}
               onChange={e=>setPerson(e.target.value)} onFocus={onFocus} onBlur={onBlur}>
-              <option value="">Selecciona o escribe…</option>
-              {PEOPLE.map(p=><option key={p} value={p}>{p}</option>)}
+              <option value="">Selecciona una persona…</option>
+              {people.map(p=><option key={p} value={p}>{p}</option>)}
+              <option value="__new__">＋ Crear tono nuevo…</option>
             </select>
+            {person === "__new__" && (
+              <input
+                style={{ ...inputSt, marginTop:8 }}
+                value={newName}
+                onChange={e=>setNewName(e.target.value)}
+                placeholder="Nombre y apellido de la persona…"
+                aria-label="Nombre de la nueva persona"
+                autoFocus
+                onFocus={onFocus} onBlur={onBlur}
+              />
+            )}
           </div>
 
           {/* linkedin url */}
@@ -1370,8 +1319,8 @@ function ToneAdapterModal({ onClose, initialPerson }: {
                   onClick={()=>window.open(url.trim(),"_blank","noopener,noreferrer")}
                   style={{
                     height:42, padding:"0 14px", borderRadius:10, flexShrink:0,
-                    border:"1.5px solid rgba(10,102,194,0.50)", background:"rgba(10,102,194,0.12)",
-                    color:"#0A66C2", fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600,
+                    border:"1px solid var(--linkedin-line)", background:"var(--linkedin-bg)",
+                    color:"var(--linkedin)", fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600,
                     cursor:"pointer", display:"flex", alignItems:"center", gap:6,
                   }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -1402,7 +1351,7 @@ function ToneAdapterModal({ onClose, initialPerson }: {
               background:"rgba(var(--accent-rgb),0.08)",
               border:"1px solid rgba(var(--accent-rgb),0.22)",
             }}>
-              <div style={{ fontSize:12, fontWeight:700, letterSpacing:"0.06em", textTransform:"uppercase", color:"var(--accent)", marginBottom:8 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:"var(--accent)", marginBottom:8 }}>
                 Tono guardado · {new Date(saved.updatedAt).toLocaleDateString("es-CO",{day:"numeric",month:"short"})}
               </div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
@@ -1413,6 +1362,8 @@ function ToneAdapterModal({ onClose, initialPerson }: {
                   { label:"Preguntas ✓", show:saved.usesQuestions },
                   { label:"Listas ✓",    show:saved.usesLists },
                   { label:`~${saved.avgWordsPerPost} palabras/post`, show:true },
+                  { label: cloud?.supabase ? "Supabase ✓" : "Supabase pendiente", show: cloud !== null },
+                  { label: cloud?.fileName ?? "", show: !!cloud?.fileName },
                 ].filter(t=>t.show).map((t,i)=>(
                   <span key={i} style={{
                     padding:"3px 9px", borderRadius:20, fontSize:12, fontWeight:500,
@@ -1428,10 +1379,10 @@ function ToneAdapterModal({ onClose, initialPerson }: {
         {/* footer */}
         <div style={{ padding:"0 24px 22px", display:"flex", gap:8, justifyContent:"flex-end" }}>
           <GlassBtn onClick={onClose}>Cancelar</GlassBtn>
-          <GlassBtn accent disabled={!person.trim() || sample.trim().length < 30 || status === "analyzing"}
+          <GlassBtn accent disabled={!effectiveName || sample.trim().length < 30 || status === "analyzing"}
             onClick={handleAnalyze}>
             {status === "analyzing"
-              ? "Analizando…"
+              ? "Analizando y guardando…"
               : status === "done"
               ? "✓ Guardado"
               : saved ? "Actualizar tono" : "Analizar y guardar"}
@@ -1471,10 +1422,11 @@ function pubDateLabel(pub: Publication): string {
 // ── SavePostModal ─────────────────────────────────────────────────────────────
 
 function SavePostModal({
-  person, topic, preview, saveStatus, savedFile, onSave, onClose,
+  person, topic, preview, saveStatus, savedFile, onSave, onClose, people = PEOPLE,
 }: {
   person: string;
   topic: string;
+  people?: string[];
   preview: string;
   saveStatus: "idle" | "saving" | "saved" | "error";
   savedFile: string;
@@ -1497,6 +1449,7 @@ function SavePostModal({
     >
       <div
         className="animate-slide-up glass-strong"
+        role="dialog" aria-modal="true" aria-label="Guardar post"
         style={{
           width:"100%", maxWidth:480, borderRadius:20,
           padding:0, overflow:"hidden",
@@ -1511,11 +1464,12 @@ function SavePostModal({
         }}>
           <div style={{
             width:36, height:36, borderRadius:10, flexShrink:0,
-            background:"rgba(var(--accent-rgb),0.14)",
-            border:"1.5px solid rgba(var(--accent-rgb),0.25)",
+            background:"var(--btn-bg)",
+            border:"1px solid var(--cal-border)",
             display:"flex", alignItems:"center", justifyContent:"center",
+            boxShadow:"var(--shadow-btn)",
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
               <polyline points="17 21 17 13 7 13 7 21"/>
               <polyline points="7 3 7 8 15 8"/>
@@ -1527,7 +1481,7 @@ function SavePostModal({
               <p style={{ fontSize:12, color:"var(--text-muted)", margin:"2px 0 0", fontWeight:500 }}>{topic}</p>
             )}
           </div>
-          <button type="button" onClick={onClose} disabled={saveStatus==="saving"}
+          <button type="button" onClick={onClose} disabled={saveStatus==="saving"} aria-label="Cerrar"
             style={{
               width:30, height:30, borderRadius:8, border:"1px solid var(--cal-border)",
               background:"var(--cal-cell-bg)", cursor:"pointer",
@@ -1544,7 +1498,7 @@ function SavePostModal({
         {/* body */}
         <div style={{ padding:"20px 24px" }}>
           {/* person selector */}
-          <label style={{ display:"block", marginBottom:6, fontSize:12, fontWeight:700, color:"var(--text-primary)", letterSpacing:"0.04em", textTransform:"uppercase" }}>
+          <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}>
             ¿Para quién es este post?
           </label>
           <select
@@ -1553,24 +1507,24 @@ function SavePostModal({
             disabled={saveStatus !== "idle"}
             style={{
               width:"100%", padding:"11px 14px", borderRadius:10, marginBottom:16,
-              border:"1.5px solid var(--cal-border)",
+              border:"1px solid var(--cal-border)",
               background:"var(--cal-urlbar-bg)",
               color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)",
               fontWeight:500, cursor:"pointer", outline:"none",
             }}
           >
             <option value="">Solo guardar (sin perfil)</option>
-            {PEOPLE.map(p => <option key={p} value={p}>{p}</option>)}
+            {people.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
 
           {/* preview */}
-          <label style={{ display:"block", marginBottom:6, fontSize:12, fontWeight:700, color:"var(--text-primary)", letterSpacing:"0.04em", textTransform:"uppercase" }}>
+          <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}>
             Vista previa
           </label>
           <div style={{
             padding:"14px 16px", borderRadius:12, marginBottom:20,
             background:"var(--cal-section-bg)",
-            border:"1.5px solid var(--cal-border)",
+            border:"1px solid var(--cal-border)",
             fontSize:13, color:"var(--text-secondary)", lineHeight:1.7,
             fontFamily:"var(--font-sans)", fontWeight:450,
             maxHeight:140, overflowY:"auto",
@@ -1583,37 +1537,37 @@ function SavePostModal({
           {saveStatus === "saved" ? (
             <div style={{
               display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
-              borderRadius:12, background:"rgba(22,163,74,0.12)",
-              border:"1.5px solid rgba(22,163,74,0.28)",
+              borderRadius:12, background:"var(--status-success-bg)",
+              border:"1px solid var(--status-success-line)",
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--status-success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
               <div>
-                <p style={{ fontSize:13, fontWeight:700, color:"#16a34a", margin:0 }}>Post guardado</p>
+                <p style={{ fontSize:13, fontWeight:700, color:"var(--status-success)", margin:0 }}>Post guardado</p>
                 {savedFile && (
-                  <p style={{ fontSize:11, color:"#16a34a", opacity:0.78, margin:"2px 0 0", fontWeight:500 }}>{savedFile}</p>
+                  <p style={{ fontSize:11, color:"var(--status-success)", opacity:0.78, margin:"2px 0 0", fontWeight:500 }}>{savedFile}</p>
                 )}
               </div>
             </div>
           ) : saveStatus === "error" ? (
             <div style={{
               display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
-              borderRadius:12, background:"rgba(220,38,38,0.10)",
-              border:"1.5px solid rgba(220,38,38,0.28)",
+              borderRadius:12, background:"var(--status-error-bg)",
+              border:"1px solid var(--status-error-line)",
               marginBottom:12,
             }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--status-error)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
-              <p style={{ fontSize:13, fontWeight:600, color:"#dc2626", margin:0 }}>No se pudo guardar. Intenta de nuevo.</p>
+              <p style={{ fontSize:13, fontWeight:600, color:"var(--status-error)", margin:0 }}>No se pudo guardar. Intenta de nuevo.</p>
             </div>
           ) : (
             <div style={{ display:"flex", gap:10 }}>
               <button type="button" onClick={onClose}
                 style={{
-                  flex:1, height:44, borderRadius:11,
-                  border:"1.5px solid var(--cal-border)",
+                  flex:1, height:44, borderRadius:10,
+                  border:"1px solid var(--cal-border)",
                   background:"var(--cal-cell-bg)",
                   color:"var(--text-primary)", fontSize:14, fontFamily:"var(--font-sans)",
                   fontWeight:600, cursor:"pointer",
@@ -1624,13 +1578,13 @@ function SavePostModal({
                 onClick={() => onSave(savePerson)}
                 disabled={saveStatus === "saving"}
                 style={{
-                  flex:2, height:44, borderRadius:11,
-                  border:"1.5px solid rgba(var(--accent-rgb),0.45)",
-                  background:"var(--accent)", color:"var(--accent-text)",
+                  flex:2, height:44, borderRadius:10,
+                  border:"1px solid var(--btn-primary-border)",
+                  background:"var(--btn-primary-bg)", color:"var(--btn-primary-text)",
                   fontSize:14, fontFamily:"var(--font-sans)", fontWeight:700,
                   cursor: saveStatus === "saving" ? "wait" : "pointer",
                   display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                  boxShadow:"var(--accent-glow)",
+                  boxShadow:"var(--shadow-btn-primary)",
                   opacity: saveStatus === "saving" ? 0.75 : 1,
                   transition:"opacity 180ms",
                 }}>
@@ -1678,6 +1632,10 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
   const [showSave,    setShowSave]    = useState(false);
   const [saveStatus,  setSaveStatus]  = useState<"idle"|"saving"|"saved"|"error">("idle");
   const [savedFile,   setSavedFile]   = useState("");
+  const [genMode,      setGenMode]      = useState<""|"ai"|"local">("");
+  const [profileFiles,  setProfileFiles]  = useState<string[]>([]);
+  const [profilePeople, setProfilePeople] = useState<Array<{ name: string; fileName: string }>>([]);
+  const [fileProfileMap, setFileProfileMap] = useState<Record<string, { fileName: string; style: string | null } | null>>({});
 
   // Sort pubs by proximity to today
   const sortedPubs = useMemo(() => [...pubs].sort((a,b) => a.startDate.localeCompare(b.startDate)), [pubs]);
@@ -1686,6 +1644,40 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
     const p = person ? loadToneProfile(person) : null;
     setProfile(p);
   }, [person, showTone]);
+
+  // Tone profiles available as files in tone_profiles/ (refreshed when the modal closes)
+  useEffect(() => {
+    fetch("/api/tone-profile")
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok && Array.isArray(d.files)) setProfileFiles(d.files);
+        if (d.ok && Array.isArray(d.people)) {
+          setProfilePeople(d.people.filter((p: { name: string }) => p.name));
+        }
+      })
+      .catch(() => {});
+  }, [showTone]);
+
+  // Selected person → load their documented tone profile (cached per person)
+  useEffect(() => {
+    if (!person || fileProfileMap[person] !== undefined) return;
+    let alive = true;
+    fetch(`/api/tone-profile?person=${encodeURIComponent(person)}`)
+      .then(r => r.json())
+      .then(d => { if (alive) setFileProfileMap(m => ({ ...m, [person]: d.ok && d.found ? { fileName: d.fileName, style: d.style ?? null } : null })); })
+      .catch(() => { if (alive) setFileProfileMap(m => ({ ...m, [person]: null })); });
+    return () => { alive = false; };
+  }, [person, fileProfileMap]);
+
+  const fileProfile = person ? fileProfileMap[person] ?? null : null;
+
+  // PEOPLE + anyone with a tone profile that isn't in the hardcoded list
+  const allPeople = useMemo(() => {
+    const extra = profilePeople
+      .filter(({ name, fileName }) => !PEOPLE.some(p => samePerson(p, name) || fileMatchesPerson(fileName, p)))
+      .map(p => p.name);
+    return [...PEOPLE, ...extra];
+  }, [profilePeople]);
 
   // When a calendar pub is selected → auto-fill topic + configure post type
   useEffect(() => {
@@ -1706,17 +1698,20 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
       const res = await fetch("/api/generate-post", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, tone, focus, length, profile, language }),
+        body: JSON.stringify({ topic, tone, focus, length, profile, language, personName: person || null }),
       });
       const data = await res.json();
       if (data.ok && data.content) {
         setGenerated(data.content);
+        setGenMode("ai");
       } else {
         // Fallback to local generation if API fails
         setGenerated(buildGeneratedPost(topic, tone, focus, length, profile));
+        setGenMode("local");
       }
     } catch {
       setGenerated(buildGeneratedPost(topic, tone, focus, length, profile));
+      setGenMode("local");
     } finally {
       setIsGen(false);
     }
@@ -1764,7 +1759,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
   // Input style — uses CSS token so dark mode works without JS
   const inputSt: React.CSSProperties = {
     width:"100%", padding:"13px 16px", borderRadius:10,
-    border:"1.5px solid var(--cal-border)",
+    border:"1px solid var(--cal-border)",
     background:"var(--cal-urlbar-bg)",
     color:"var(--text-primary)", fontSize:15, fontFamily:"var(--font-sans)",
     outline:"none", transition:"border-color 180ms, box-shadow 180ms",
@@ -1799,19 +1794,20 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
         }}>
 
           {/* ── STEP 1: Calendar link ── */}
-          <div className="dm-surface" style={{
-            background:"rgba(255,255,255,0.52)",
-            border:"1.5px solid rgba(255,255,255,0.65)",
-            borderRadius:18,
+          <div style={{
+            background:"var(--card-bg)",
+            border:"1px solid var(--card-border)",
+            borderRadius:16,
             padding:"22px 24px",
-            boxShadow:"0 2px 16px rgba(0,0,0,0.07), inset 0 1.5px 0 rgba(255,255,255,0.85)",
+            boxShadow:"var(--shadow-card)",
           }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-              <span style={{
-                width:28, height:28, borderRadius:9, background:"var(--accent)",
-                display:"inline-flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-                fontSize:13, fontWeight:800, color:"var(--accent-text)",
-              }}>1</span>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+              <IconTile>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </IconTile>
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Relacionar con el calendario
               </span>
@@ -1854,18 +1850,18 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
           </div>
 
           {/* ── STEP 2: Topic ── */}
-          <div className="dm-surface" style={{
-            background:"rgba(255,255,255,0.52)",
-            border:"1.5px solid rgba(255,255,255,0.65)",
-            borderRadius:18, padding:"22px 24px",
-            boxShadow:"0 2px 16px rgba(0,0,0,0.07), inset 0 1.5px 0 rgba(255,255,255,0.85)",
+          <div style={{
+            background:"var(--card-bg)",
+            border:"1px solid var(--card-border)",
+            borderRadius:16, padding:"22px 24px",
+            boxShadow:"var(--shadow-card)",
           }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-              <span style={{
-                width:28, height:28, borderRadius:9, background:"var(--accent)",
-                display:"inline-flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-                fontSize:13, fontWeight:800, color:"var(--accent-text)",
-              }}>2</span>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+              <IconTile>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                </svg>
+              </IconTile>
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Describe el tema
               </span>
@@ -1880,19 +1876,22 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
           </div>
 
           {/* ── STEP 3: Config ── */}
-          <div className="dm-surface" style={{
-            background:"rgba(255,255,255,0.52)",
-            border:"1.5px solid rgba(255,255,255,0.65)",
-            borderRadius:18, padding:"22px 24px",
-            boxShadow:"0 2px 16px rgba(0,0,0,0.07), inset 0 1.5px 0 rgba(255,255,255,0.85)",
+          <div style={{
+            background:"var(--card-bg)",
+            border:"1px solid var(--card-border)",
+            borderRadius:16, padding:"22px 24px",
+            boxShadow:"var(--shadow-card)",
             display:"flex", flexDirection:"column", gap:20,
           }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{
-                width:28, height:28, borderRadius:9, background:"var(--accent)",
-                display:"inline-flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-                fontSize:13, fontWeight:800, color:"var(--accent-text)",
-              }}>3</span>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <IconTile>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/>
+                  <line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/>
+                  <line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/>
+                  <line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>
+                </svg>
+              </IconTile>
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Ajusta el estilo
               </span>
@@ -1918,13 +1917,13 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
 
             {/* tono */}
             <div>
-              <label style={{ ...labelSt, display:"flex", alignItems:"center", gap:6 }}>
+              <label style={{ ...labelSt, display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
                 Tono
-                {profile && <span style={{ fontSize:10, fontWeight:600, color:"var(--accent)", background:"rgba(var(--accent-rgb),0.12)", padding:"1px 7px", borderRadius:20, letterSpacing:"0.04em" }}>sobreescrito por perfil</span>}
+                {(fileProfile || profile) && person && <span style={{ fontSize:11, fontWeight:600, color:"var(--accent)", background:"rgba(var(--accent-rgb),0.12)", padding:"2px 8px", borderRadius:20 }}>lo define el perfil de {person.split(" ")[0]}</span>}
               </label>
-              <select style={{ ...inputSt, cursor:"pointer", opacity: profile ? 0.55 : 1 }}
+              <select style={{ ...inputSt, cursor:"pointer" }}
                 value={tone} onChange={e=>setTone(e.target.value)}
-                disabled={!!profile} onFocus={onFocusFn} onBlur={onBlurFn}>
+                onFocus={onFocusFn} onBlur={onBlurFn}>
                 {TONE_OPTIONS.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
@@ -1943,33 +1942,43 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
           </div>
 
           {/* ── STEP 4: Author / tone ── */}
-          <div className="dm-surface" style={{
-            background:"rgba(255,255,255,0.52)",
-            border:"1.5px solid rgba(255,255,255,0.65)",
-            borderRadius:18, padding:"22px 24px",
-            boxShadow:"0 2px 16px rgba(0,0,0,0.07), inset 0 1.5px 0 rgba(255,255,255,0.85)",
+          <div style={{
+            background:"var(--card-bg)",
+            border:"1px solid var(--card-border)",
+            borderRadius:16, padding:"22px 24px",
+            boxShadow:"var(--shadow-card)",
           }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-              <span style={{
-                width:28, height:28, borderRadius:9, background:"var(--accent)",
-                display:"inline-flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-                fontSize:13, fontWeight:800, color:"var(--accent-text)",
-              }}>4</span>
+            <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+              <IconTile>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              </IconTile>
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Autor y tono personal
               </span>
-              <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-muted)", fontWeight:500 }}>opcional</span>
+              <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-secondary)", fontWeight:500 }}>opcional</span>
             </div>
+            <p style={{ fontSize:13, color:"var(--text-secondary)", margin:"-6px 0 14px", lineHeight:1.5 }}>
+              Elige quién firma el post y se redactará con su estilo real de LinkedIn.
+            </p>
             <div style={{ display:"flex", gap:8 }}>
-              <select style={{ ...inputSt, flex:1, cursor:"pointer" }} value={person}
+              <label htmlFor="post-person" style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0,0,0,0)" }}>
+                Autor del post
+              </label>
+              <select id="post-person" style={{ ...inputSt, flex:1, cursor:"pointer" }} value={person}
                 onChange={e=>setPerson(e.target.value)} onFocus={onFocusFn} onBlur={onBlurFn}>
                 <option value="">Sin tono personal</option>
-                {PEOPLE.map(p=><option key={p} value={p}>{p}</option>)}
+                {allPeople.map(p=>(
+                  <option key={p} value={p}>
+                    {p}{profileFiles.some(f => fileMatchesPerson(f, p)) ? " · tono listo ✓" : ""}
+                  </option>
+                ))}
               </select>
               <button type="button" onClick={()=>setShowTone(true)}
                 style={{
                   height:48, padding:"0 16px", borderRadius:10, flexShrink:0,
-                  border:`1.5px solid ${profile ? "rgba(var(--accent-rgb),0.50)" : "var(--cal-urlbar-border)"}`,
+                  border:`1px solid ${profile ? "rgba(var(--accent-rgb),0.50)" : "var(--cal-urlbar-border)"}`,
                   background: profile ? "rgba(var(--accent-rgb),0.14)" : "var(--cal-cell-bg)",
                   color: profile ? "var(--accent)" : "var(--text-primary)",
                   fontSize:12, fontFamily:"var(--font-sans)", fontWeight:700,
@@ -1981,7 +1990,29 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 ✦ {profile ? "Tono activo" : "Adaptar tono"}
               </button>
             </div>
-            {profile && (
+            {person && fileProfile && (
+              <div role="status" style={{
+                marginTop:10, padding:"10px 14px", borderRadius:10,
+                background:"var(--status-success-bg)",
+                border:"1px solid var(--status-success-line)",
+                display:"flex", alignItems:"flex-start", gap:10,
+              }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--status-success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0, marginTop:2 }}>
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <div style={{ fontSize:13, color:"var(--text-primary)", lineHeight:1.5 }}>
+                  <strong>El post saldrá con el tono de {person}</strong>
+                  {fileProfile.style ? <> · {fileProfile.style}</> : null}
+                  <div style={{ fontSize:11, color:"var(--text-secondary)", marginTop:2 }}>Perfil: {fileProfile.fileName}</div>
+                </div>
+              </div>
+            )}
+            {person && !fileProfile && !profile && (
+              <p style={{ marginTop:10, fontSize:12, color:"var(--text-secondary)", lineHeight:1.5 }}>
+                {person} aún no tiene perfil de tono. Usa “Adaptar tono” para crearlo con sus posts reales.
+              </p>
+            )}
+            {profile && !fileProfile && (
               <div style={{ marginTop:8, display:"flex", flexWrap:"wrap", gap:5 }}>
                 {[
                   `Estilo ${profile.writingStyle}`,
@@ -2005,14 +2036,14 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
             disabled={!topic.trim() || isGen}
             className="ripple-effect hover-lift"
             style={{
-              height:56, borderRadius:16,
-              border: topic.trim() ? "1px solid var(--cal-urlbar-border)" : "1.5px solid var(--cal-border)",
-              background: !topic.trim() ? "var(--cal-cell-bg)" : "var(--accent)",
-              color: !topic.trim() ? "var(--text-muted)" : "var(--accent-text)",
+              height:56, borderRadius:12,
+              border: topic.trim() ? "1px solid var(--btn-primary-border)" : "1px solid var(--cal-border)",
+              background: !topic.trim() ? "var(--cal-cell-bg)" : "var(--btn-primary-bg)",
+              color: !topic.trim() ? "var(--text-muted)" : "var(--btn-primary-text)",
               fontSize:16, fontFamily:"var(--font-sans)", fontWeight:700,
               cursor: !topic.trim() ? "not-allowed" : "pointer",
               display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              boxShadow: topic.trim() ? "var(--accent-glow), 0 4px 16px rgba(0,0,0,0.10)" : "none",
+              boxShadow: topic.trim() ? "var(--shadow-btn-primary)" : "none",
               opacity: isGen ? 0.75 : 1,
               transition:"all 220ms",
               letterSpacing:"-0.01em",
@@ -2046,14 +2077,14 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
             display:"flex", alignItems:"center", gap:10, flexShrink:0,
             background:"var(--cal-header-bg)",
           }}>
-            <span style={{ fontSize:13, fontWeight:700, letterSpacing:"0.06em", color:"var(--text-primary)", textTransform:"uppercase", flex:1 }}>
+            <span style={{ fontSize:14, fontWeight:700, letterSpacing:"-0.01em", color:"var(--text-primary)", flex:1 }}>
               Post generado
             </span>
             <button type="button" onClick={handleGenerate}
               disabled={!topic.trim() || isGen}
               style={{
                 height:38, padding:"0 16px", borderRadius:10,
-                border:"1.5px solid var(--cal-border)",
+                border:"1px solid var(--cal-border)",
                 background:"var(--cal-cell-bg)",
                 color: !topic.trim() || isGen ? "var(--text-muted)" : "var(--text-primary)",
                 fontSize:13, fontFamily:"var(--font-sans)", fontWeight:600,
@@ -2093,7 +2124,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
           </div>
 
           {/* generated area */}
-          <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
+          <div style={{ flex:1, position:"relative", overflow:"hidden", display:"flex", flexDirection:"column" }}>
             {!generated ? (
               <div style={{
                 position:"absolute", inset:0,
@@ -2101,14 +2132,14 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 padding:32,
               }}>
                 <div style={{
-                  width:64, height:64, borderRadius:20,
-                  background:"var(--cal-cell-bg)",
-                  border:"1.5px solid var(--cal-urlbar-border)",
+                  width:64, height:64, borderRadius:16,
+                  background:"var(--btn-bg)",
+                  border:"1px solid var(--cal-border)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  boxShadow:"0 4px 20px rgba(0,0,0,0.08)",
+                  boxShadow:"var(--shadow-btn)",
                 }}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="var(--accent)" strokeWidth="1.5" fill="none"/>
+                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="var(--text-secondary)" strokeWidth="1.5" fill="none"/>
                   </svg>
                 </div>
                 <div style={{ textAlign:"center" }}>
@@ -2118,7 +2149,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                   <p style={{ fontSize:13, color:"var(--text-secondary)", lineHeight:1.6, maxWidth:260 }}>
                     {topic.trim()
                       ? `Haz clic en "Generar post" y tu contenido aparecerá aquí listo para editar.`
-                      : "Completa los pasos de la izquierda:\n1. Vincula una publicación del calendario\n2. Describe el tema\n3. Ajusta el estilo y genera."}
+                      : "Describe el tema a la izquierda, ajusta el estilo, elige el autor y genera."}
                   </p>
                 </div>
                 {topic.trim() && (
@@ -2126,11 +2157,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                     className="ripple-effect hover-lift"
                     style={{
                       height:40, padding:"0 20px", borderRadius:12,
-                      border:"1px solid rgba(255,255,255,0.35)",
-                      background:"var(--accent)", color:"var(--accent-text)",
+                      border:"1px solid var(--btn-primary-border)",
+                      background:"var(--btn-primary-bg)", color:"var(--btn-primary-text)",
                       fontSize:13, fontFamily:"var(--font-sans)", fontWeight:700,
                       cursor:"pointer", display:"flex", alignItems:"center", gap:7,
-                      boxShadow:"var(--accent-glow)",
+                      boxShadow:"var(--shadow-btn-primary)",
                     }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                       <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" fill="currentColor"/>
@@ -2140,16 +2171,28 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 )}
               </div>
             ) : (
-              <textarea
-                style={{
-                  width:"100%", height:"100%", padding:"32px 36px",
-                  border:"none", background:"transparent",
-                  color:"var(--text-primary)", fontSize:15.5, fontFamily:"var(--font-sans)",
-                  lineHeight:1.85, resize:"none", outline:"none", fontWeight:450,
-                }}
-                value={generated}
-                onChange={e=>setGenerated(e.target.value)}
-              />
+              <>
+                {genMode === "local" && (
+                  <div role="status" style={{
+                    margin:"14px 28px 0", padding:"8px 12px", borderRadius:8, flexShrink:0,
+                    background:"var(--status-error-bg)", border:"1px solid var(--status-error-line)",
+                    fontSize:12, fontWeight:600, color:"var(--status-error)",
+                  }}>
+                    Sin conexión con la IA: se usó una plantilla local. Revisa el texto antes de publicar.
+                  </div>
+                )}
+                <textarea
+                  aria-label="Post generado (editable)"
+                  style={{
+                    width:"100%", flex:1, padding:"32px 36px",
+                    border:"none", background:"transparent",
+                    color:"var(--text-primary)", fontSize:15.5, fontFamily:"var(--font-sans)",
+                    lineHeight:1.85, resize:"none", outline:"none", fontWeight:450,
+                  }}
+                  value={generated}
+                  onChange={e=>setGenerated(e.target.value)}
+                />
+              </>
             )}
           </div>
 
@@ -2160,18 +2203,18 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
             background:"var(--cal-header-bg)", flexShrink:0,
           }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:13, color: generated.length > 2800 ? "#dc2626" : "var(--text-secondary)", fontFamily:"var(--font-sans)", fontWeight:500 }}>
+              <span style={{ fontSize:13, color: generated.length > 2800 ? "var(--status-error)" : "var(--text-secondary)", fontFamily:"var(--font-sans)", fontWeight:500 }}>
                 {generated.length} <span style={{ color:"var(--text-muted)" }}>/ 3000</span>
               </span>
               {generated.length > 2800 && (
-                <span style={{ fontSize:12, color:"#dc2626", fontWeight:600 }}>Cerca del límite</span>
+                <span style={{ fontSize:12, color:"var(--status-error)", fontWeight:600 }}>Cerca del límite</span>
               )}
             </div>
             <div style={{ display:"flex", gap:8 }}>
               <button type="button" onClick={()=>setShowSave(true)} disabled={!generated}
                 className="ripple-effect hover-lift"
                 style={{
-                  height:42, padding:"0 18px", borderRadius:11,
+                  height:42, padding:"0 18px", borderRadius:10,
                   border:`1.5px solid ${generated ? "rgba(var(--accent-rgb),0.40)" : "var(--cal-border)"}`,
                   background: generated ? "rgba(var(--accent-rgb),0.10)" : "var(--cal-cell-bg)",
                   color: generated ? "var(--accent)" : "var(--text-muted)",
@@ -2179,7 +2222,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                   cursor: !generated ? "not-allowed" : "pointer",
                   display:"flex", alignItems:"center", gap:7,
                   opacity: !generated ? 0.5 : 1,
-                  boxShadow: generated ? "0 2px 10px rgba(var(--accent-rgb),0.18)" : "none",
+                  boxShadow: generated ? "var(--shadow-btn)" : "none",
                   transition:"all 180ms",
                 }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -2192,15 +2235,15 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <button type="button" onClick={handlePostLinkedIn} disabled={!generated}
                 className="ripple-effect hover-lift"
                 style={{
-                  height:42, padding:"0 20px", borderRadius:11,
-                  border:"1.5px solid rgba(10,102,194,0.45)",
-                  background: generated ? "rgba(10,102,194,0.14)" : "var(--cal-cell-bg)",
-                  color: generated ? "#0A66C2" : "var(--text-muted)",
+                  height:42, padding:"0 20px", borderRadius:10,
+                  border:"1px solid var(--linkedin-line)",
+                  background: generated ? "var(--linkedin-bg)" : "var(--cal-cell-bg)",
+                  color: generated ? "var(--linkedin)" : "var(--text-muted)",
                   fontSize:14, fontFamily:"var(--font-sans)", fontWeight:700,
                   cursor: !generated ? "not-allowed" : "pointer",
                   display:"flex", alignItems:"center", gap:8,
                   opacity: !generated ? 0.5 : 1,
-                  boxShadow: generated ? "0 2px 14px rgba(10,102,194,0.22)" : "none",
+                  boxShadow: generated ? "var(--shadow-btn)" : "none",
                   transition:"all 180ms",
                 }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -2216,7 +2259,8 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
       {showTone && (
         <ToneAdapterModal
           initialPerson={person}
-          onClose={()=>setShowTone(false)}
+          people={allPeople}
+          onClose={()=>{ setShowTone(false); setFileProfileMap({}); }}
         />
       )}
 
@@ -2224,6 +2268,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
       {showSave && (
         <SavePostModal
           person={person}
+          people={allPeople}
           topic={cleanTopic}
           preview={generated}
           saveStatus={saveStatus}
@@ -2242,11 +2287,9 @@ function MacWindow({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       flex:1, display:"flex", flexDirection:"column",
-      borderRadius:22, overflow:"hidden",
-      border:"1px solid var(--glass-border)",
+      borderRadius:14, overflow:"hidden", minHeight:0,
+      border:"1px solid var(--cal-border)",
       background:"var(--cal-window-bg)",
-      backdropFilter:"blur(80px) saturate(250%)",
-      WebkitBackdropFilter:"blur(80px) saturate(250%)",
       boxShadow:"var(--shadow-window)",
     }}>
       {/* Titlebar */}
@@ -2261,24 +2304,23 @@ function MacWindow({ children }: { children: React.ReactNode }) {
         <div style={{ display:"flex", gap:7, marginRight:18 }}>
           {(["#ff5f57","#febc2e","#28c840"] as const).map((col, i) => (
             <div key={i} style={{
-              width:13, height:13, borderRadius:"50%", background:col,
-              boxShadow:`inset 0 0.5px 0 rgba(0,0,0,0.18), 0 1px 4px ${col}88`,
+              width:12, height:12, borderRadius:"50%", background:col,
+              boxShadow:"inset 0 0.5px 1px rgba(0,0,0,0.25)",
             }} />
           ))}
         </div>
         <div style={{
-          flex:1, maxWidth:380, margin:"0 auto",
-          height:24, borderRadius:8,
+          flex:1, maxWidth:360, margin:"0 auto",
+          height:24, borderRadius:7,
           background:"var(--cal-urlbar-bg)",
-          border:"1px solid var(--cal-urlbar-border)",
+          border:"1px solid var(--cal-border)",
           display:"flex", alignItems:"center", justifyContent:"center",
           fontSize:12, fontWeight:500, color:"var(--text-muted)",
-          fontFamily:"var(--font-sans)",
-          letterSpacing:"0.01em",
+          fontFamily:"var(--font-sans)", letterSpacing:"0.01em",
         }}>
           linkedin-calendar.local
         </div>
-        <div style={{ width:82 }} />
+        <div style={{ width:75 }} />
       </div>
 
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", minHeight:0 }}>
@@ -2288,36 +2330,46 @@ function MacWindow({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── FloatingOrbs ──────────────────────────────────────────────────────────────
+// ── Toasts ────────────────────────────────────────────────────────────────────
 
-function FloatingOrbs() {
-  const orbs = [
-    { top:"8%",   left:"6%",   w:200, h:200, delay:"0s",   dur:"8s",  anim:"float",    op:0.45 },
-    { top:"65%",  right:"7%",  w:140, h:140, delay:"1.8s", dur:"10s", anim:"floatAlt", op:0.38 },
-    { top:"45%",  right:"3%",  w:80,  h:80,  delay:"3.5s", dur:"7s",  anim:"float",    op:0.30 },
-    { top:"25%",  right:"18%", w:55,  h:55,  delay:"0.8s", dur:"9s",  anim:"floatAlt", op:0.35 },
-    { bottom:"12%",left:"4%",  w:70,  h:70,  delay:"2.2s", dur:"11s", anim:"float",    op:0.28 },
-    { top:"78%",  left:"30%",  w:45,  h:45,  delay:"4s",   dur:"6s",  anim:"floatAlt", op:0.25 },
-  ] as const;
+interface ToastItem { id: number; kind: "success" | "error"; msg: string; retry?: () => void }
+let toastSeq = 0;
 
+function Toasts({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   return (
-    <div aria-hidden="true" style={{ position:"fixed", inset:0, overflow:"hidden", pointerEvents:"none", zIndex:0 }}>
-      {orbs.map((o, i) => (
-        <div key={i} style={{
-          position:"absolute",
-          ...("top" in o ? { top:o.top } : {}),
-          ...("bottom" in o ? { bottom:(o as {bottom:string}).bottom } : {}),
-          ...("left" in o ? { left:(o as {left:string}).left } : {}),
-          ...("right" in o ? { right:(o as {right:string}).right } : {}),
-          width:o.w, height:o.h, borderRadius:"50%",
-          background:"rgba(255,255,255,0.14)",
-          backdropFilter:"blur(20px) saturate(160%)",
-          WebkitBackdropFilter:"blur(20px) saturate(160%)",
-          border:"1.5px solid rgba(255,255,255,0.30)",
-          boxShadow:"0 8px 32px rgba(255,255,255,0.15), inset 0 1.5px 0 rgba(255,255,255,0.45)",
-          opacity:o.op,
-          animation:`${o.anim} ${o.dur} ease-in-out infinite ${o.delay}`,
-        }} />
+    <div aria-live="polite" style={{
+      position:"fixed", right:20, bottom:20, zIndex:600,
+      display:"flex", flexDirection:"column", gap:8, pointerEvents:"none",
+    }}>
+      {toasts.map(t => (
+        <div key={t.id} role="status" className="animate-toast-in" style={{
+          display:"flex", alignItems:"center", gap:12, maxWidth:360,
+          padding:"12px 14px 12px 16px", borderRadius:10,
+          fontSize:13, fontWeight:600, fontFamily:"var(--font-sans)",
+          color:"#fff", pointerEvents:"auto",
+          background: t.kind === "success" ? "#15803d" : "#b91c1c",
+          boxShadow:"0 8px 30px rgba(0,0,0,0.28)",
+        }}>
+          <span style={{ flex:1 }}>{t.msg}</span>
+          {t.retry && (
+            <button type="button"
+              onClick={() => { onDismiss(t.id); t.retry?.(); }}
+              style={{
+                border:"1px solid rgba(255,255,255,0.45)", background:"rgba(255,255,255,0.14)",
+                color:"#fff", borderRadius:6, padding:"4px 10px", fontSize:12, fontWeight:700,
+                cursor:"pointer", fontFamily:"var(--font-sans)", flexShrink:0,
+              }}>
+              Reintentar
+            </button>
+          )}
+          <button type="button" aria-label="Cerrar aviso" onClick={() => onDismiss(t.id)}
+            style={{
+              border:"none", background:"transparent", color:"#fff", opacity:0.85,
+              cursor:"pointer", fontSize:15, lineHeight:1, padding:2, flexShrink:0,
+            }}>
+            ✕
+          </button>
+        </div>
       ))}
     </div>
   );
@@ -2326,7 +2378,7 @@ function FloatingOrbs() {
 // ── CalendarPage ──────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
-  const [dark,      setDark]      = useState(false);
+  const [dark,      setDark]      = useState(true);
   const [activeTab, setActiveTab] = useState<"calendar"|"create">("calendar");
   const [createPubId, setCreatePubId] = useState("");
   const [filter, setFilter] = useState<CountryKey>("LATAM");
@@ -2334,6 +2386,14 @@ export default function CalendarPage() {
   const [month,  setMonth]  = useState(() => TODAY.getMonth());
   const [pubs,   setPubs]   = useState<Publication[]>(SEED);
   const [modal,  setModal]  = useState<ModalState>({ mode:"closed" });
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const dismissToast = useCallback((id: number) => setToasts(ts => ts.filter(t => t.id !== id)), []);
+  const notify = useCallback((kind: ToastItem["kind"], msg: string, retry?: () => void) => {
+    const id = ++toastSeq;
+    setToasts(ts => [...ts, { id, kind, msg, retry }]);
+    if (kind === "success") setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 4000);
+  }, []);
 
   const todayStr = toDateStr(TODAY);
 
@@ -2342,10 +2402,24 @@ export default function CalendarPage() {
   }, [dark]);
 
   useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (modal.mode !== "closed" || activeTab !== "calendar") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.key === "ArrowLeft")  { e.preventDefault(); prevMonth(); }
+      if (e.key === "ArrowRight") { e.preventDefault(); nextMonth(); }
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); setModal({ mode:"create", date: todayStr }); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
+
+  useEffect(() => {
     fetch("/api/publications")
       .then(r => r.json())
       .then((data: Publication[]) => { if (Array.isArray(data) && data.length > 0) setPubs(data); })
-      .catch(() => {});
+      .catch(() => notify("error", "No se pudieron cargar las publicaciones guardadas."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const visiblePubs = useMemo(() => pubs.filter(p => filter === "LATAM" || p.country === filter), [pubs, filter]);
@@ -2363,7 +2437,9 @@ export default function CalendarPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),
-    }).catch(() => {});
+    })
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación guardada"); })
+      .catch(() => notify("error", "No se pudo guardar la publicación.", () => savePub(p)));
   }
 
   function deletePub(id: string) {
@@ -2373,7 +2449,9 @@ export default function CalendarPage() {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
-    }).catch(() => {});
+    })
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación eliminada"); })
+      .catch(() => notify("error", "No se pudo eliminar la publicación."));
   }
 
   function weekFlags(week: Date[]) {
@@ -2391,7 +2469,6 @@ export default function CalendarPage() {
       height:"100svh", display:"flex", flexDirection:"column",
       padding:"12px", position:"relative", zIndex:1,
     }}>
-      <FloatingOrbs />
 
       <MacWindow>
         {/* ── Toolbar ── */}
@@ -2413,11 +2490,12 @@ export default function CalendarPage() {
                 { id:"create"   as const, label:"Crea tu post",  icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg> },
               ] as const).map(tab => (
                 <button key={tab.id} type="button" onClick={()=>setActiveTab(tab.id)}
+                  aria-pressed={activeTab===tab.id}
                   style={{
                     display:"flex", alignItems:"center", gap:7,
-                    height:34, padding:"0 18px", borderRadius:9, border:"none",
-                    background: activeTab===tab.id ? "var(--accent)" : "transparent",
-                    color: activeTab===tab.id ? "var(--accent-text)" : "var(--text-secondary)",
+                    height:34, padding:"0 18px", borderRadius:8, border:"none",
+                    background: activeTab===tab.id ? "var(--tab-active-bg)" : "transparent",
+                    color: activeTab===tab.id ? "var(--text-primary)" : "var(--text-secondary)",
                     fontSize:14, fontFamily:"var(--font-sans)", fontWeight:600,
                     cursor:"pointer", transition:"all 180ms",
                     boxShadow: activeTab===tab.id ? "var(--shadow-btn)" : "none",
@@ -2441,7 +2519,7 @@ export default function CalendarPage() {
                 <CountryDropdown selected={filter} onChange={setFilter} />
               </>
             )}
-            <GlassBtn onClick={() => setDark(!dark)} small aria-label={dark ? "Light mode" : "Dark mode"}>
+            <GlassBtn onClick={() => setDark(!dark)} small aria-label={dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
               {dark
                 ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                 : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -2475,8 +2553,8 @@ export default function CalendarPage() {
             {/* Arrow buttons — same style as the screenshot */}
             <div style={{ display:"flex", gap:6, alignSelf:"center", marginTop:2 }}>
               {[
-                { fn: prevMonth, label:"Previous month", d:"M7 1L1 6.5L7 12" },
-                { fn: nextMonth, label:"Next month",     d:"M1 1L7 6.5L1 12" },
+                { fn: prevMonth, label:"Mes anterior",  d:"M7 1L1 6.5L7 12" },
+                { fn: nextMonth, label:"Mes siguiente", d:"M1 1L7 6.5L1 12" },
               ].map(({ fn, label, d }) => (
                 <button
                   key={label}
@@ -2520,7 +2598,7 @@ export default function CalendarPage() {
                 padding:"7px 0", textAlign:"center",
                 fontSize:11, fontWeight:600, letterSpacing:"0.05em",
                 fontFamily:"var(--font-sans)",
-                color: i===0||i===6 ? "var(--text-muted)" : "var(--text-secondary)",
+                color:"var(--text-secondary)",
                 borderLeft:"1px solid var(--cal-border)",
                 textTransform:"uppercase",
               }}
@@ -2582,7 +2660,7 @@ export default function CalendarPage() {
                         }}
                         onMouseEnter={e => { if (!isToday) (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-hover)"; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isToday ? "var(--cal-cell-today)" : weekend ? "var(--cal-cell-weekend)" : "var(--cal-cell-bg)"; }}
-                        onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "inset 0 0 0 2px var(--accent)"; }}
+                        onFocus={e => { (e.currentTarget as HTMLElement).style.boxShadow = "inset 0 0 0 2px var(--accent)"; }} 
                         onBlur={e  => { (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
                       >
                         <div style={{ padding:"4px 5px 2px", display:"flex", justifyContent:"flex-end", flexShrink:0 }}>
@@ -2592,8 +2670,8 @@ export default function CalendarPage() {
                             fontFamily:"var(--font-sans)", fontWeight: isToday ? 700 : 500,
                             background: isToday ? "var(--accent)" : "transparent",
                             color: isToday ? "var(--accent-text)" : inMonth ? "var(--text-primary)" : "var(--text-muted)",
-                            opacity: inMonth ? 1 : 0.30,
-                            boxShadow: isToday ? "0 2px 10px rgba(var(--accent-rgb),0.45)" : "none",
+                            opacity: inMonth ? 1 : 0.55,
+                            boxShadow:"none",
                           }}>
                             {day.getDate()}
                           </span>
@@ -2623,14 +2701,14 @@ export default function CalendarPage() {
                             height:22,
                             zIndex:10,
                             background:bg, color:fg,
-                            border:`1px solid rgba(255,255,255,0.20)`,
+                            border:"1px solid var(--cal-border)",
                             borderRadius:6,
                             cursor:"pointer", fontSize:11,
                             fontFamily:"var(--font-sans)", fontWeight:600,
                             overflow:"hidden", whiteSpace:"nowrap",
                             display:"flex", alignItems:"center",
                             padding:"0 6px", gap:4,
-                            boxShadow:"0 4px 12px rgba(0,0,0,0.18), inset 0 1.5px 0 rgba(255,255,255,0.55)",
+                            boxShadow:"0 1px 2px rgba(0,0,0,0.20)",
                             transition:"opacity 120ms, transform 200ms",
                           }}
                           onMouseEnter={e => {
@@ -2664,7 +2742,7 @@ export default function CalendarPage() {
         {/* ── Status bar ── */}
         <div style={{
           display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"7px 20px", borderTop:"1px solid rgba(255,255,255,0.10)",
+          padding:"7px 20px", borderTop:"1px solid var(--cal-border)",
           background:"var(--cal-statusbar-bg)",
           fontSize:12, fontWeight:500, letterSpacing:"0.01em",
           color:"var(--text-secondary)", flexShrink:0,
@@ -2674,7 +2752,7 @@ export default function CalendarPage() {
             <span style={{ color:"var(--text-muted)", margin:"0 6px" }}>·</span>
             {filter==="LATAM" ? "Todos los mercados" : CMAP[filter].label}
           </span>
-          <span style={{ color:"var(--text-muted)" }}>Haz clic en cualquier día para planificar</span>
+          <span style={{ color:"var(--text-secondary)" }}>Clic en un día para planificar · N nuevo post · ← → cambiar mes</span>
         </div>
         </>}
       </MacWindow>
@@ -2691,6 +2769,8 @@ export default function CalendarPage() {
           onGoToCreate={pubId => { setModal({ mode:"closed" }); setCreatePubId(pubId); setActiveTab("create"); }}
         />
       )}
+
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

@@ -2,9 +2,13 @@
 
 ## Theme
 
-Gradient-first, glass-selective. The background is a fixed photographic gradient (`/images/gradient-background.jpg`), creating ambient depth without per-element decoration. The calendar window floats on top as a heavy frosted panel. **Glassmorphism is structural only** — it applies at the window and modal level, not to individual buttons, inputs, or event chips. Interactive elements use flat surfaces so the calendar grid stays legible against the gradient.
-
-Light mode: white-tinted frost over the gradient. Dark mode: deep purple-navy tinted glass, allowing gradient hues to bleed through at reduced intensity.
+Quiet product surface, dark-first. Solid near-black violet-cast panes, hairline borders
+(`--cal-border`), and soft buttons with real depth: the primary action is a soft off-white
+button (`--btn-primary-bg`: subtle vertical gradient + inset top highlight + crisp 1px shadow),
+never a glowing accent fill. No glassmorphism, no background imagery: color lives in content
+(country chips, flags, accent details), not in chrome. Light mode mirrors the same structure
+with an ink primary button on near-white panes. A soft synthesized click (Web Audio) gives
+controls tactile feedback. Reference register: Linear/Vercel-class dark product UI.
 
 ## Color Tokens
 

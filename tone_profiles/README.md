@@ -16,12 +16,9 @@ Cada perfil documenta el estilo real de LinkedIn de esa persona para que el gene
 ### 2. Para activar el tono en la app
 1. Abre la app → pestaña **"Crea tu post"**
 2. Selecciona la persona en el campo **"Autor y tono personal"**
-3. Haz clic en **"✦ Adaptar tono"**
-4. Copia los posts de la sección "Posts de referencia" del perfil .md
-5. Pégalos en el modal y haz clic en **"Analizar y guardar"**
-6. El tono queda guardado en el navegador para esa persona
+3. Listo. Si la persona tiene un archivo de perfil en esta carpeta (verás "tono listo ✓" junto a su nombre), el generador lee el perfil automáticamente y redacta el post con su estilo real. No hay que copiar ni pegar nada.
 
-> El análisis se guarda en `localStorage` del navegador — una sola vez por persona. La próxima vez que alguien use la app, si ya está guardado, aparece automáticamente.
+> Para personas **sin** archivo de perfil, sigue funcionando el flujo manual: botón **"✦ Adaptar tono"** → pegar 3-5 posts reales → **"Analizar y guardar"**. Ese análisis se guarda en `localStorage` del navegador. Cuando exista el archivo .md, este siempre tiene prioridad.
 
 ---
 
