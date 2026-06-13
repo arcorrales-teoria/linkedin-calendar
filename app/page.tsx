@@ -383,22 +383,121 @@ function IconTile({ children, size = 38 }: { children: React.ReactNode; size?: n
   );
 }
 
-// ── HelpHint — small "?" dot that reveals a tooltip on hover / focus ──────────
-// Nada aparece al entrar: solo una bolita discreta. Al pasar el cursor (o con el
-// teclado) muestra qué hace cada herramienta. Posición fija para no recortarse
-// dentro de paneles con scroll.
+// ── Ayuda interactiva ─────────────────────────────────────────────────────────
+// Nada aparece al entrar. Al pasar el cursor por una herramienta, esta se ilumina
+// y revela su explicación. Dos formatos:
+//   · HelpCard  → tarjeta que crece y muestra una franja al hacer hover.
+//   · HintZone  → envuelve botones/controles y muestra un globo flotante al hover.
 
-function HelpHint({ text, title, label = "Más información" }: { text: string; title?: string; label?: string }) {
-  const [rect, setRect] = useState<{ x: number; top: number; bottom: number } | null>(null);
-  const ref = useRef<HTMLButtonElement>(null);
+const INFO_ICON = (
+  <span aria-hidden="true" style={{
+    flexShrink:0, width:18, height:18, borderRadius:"50%", marginTop:1,
+    display:"inline-flex", alignItems:"center", justifyContent:"center",
+    background:"rgba(var(--accent-rgb),0.16)", color:"var(--accent)",
+    fontSize:12, fontWeight:700, fontFamily:"var(--font-sans)", lineHeight:1,
+  }}>i</span>
+);
 
+// Tarjeta que se ilumina al hover y revela una franja explicativa debajo del contenido.
+function HelpCard({
+  hint, title, children, contentStyle, style,
+}: {
+  hint: string; title: string; children: React.ReactNode;
+  contentStyle?: React.CSSProperties; style?: React.CSSProperties;
+}) {
+  const [active, setActive] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onFocus={() => setActive(true)}
+      onBlur={e => { if (!ref.current?.contains(e.relatedTarget as Node)) setActive(false); }}
+      style={{
+        background:"var(--card-bg)",
+        border:`1px solid ${active ? "rgba(var(--accent-rgb),0.45)" : "var(--card-border)"}`,
+        borderRadius:16, padding:"22px 24px",
+        boxShadow: active
+          ? "0 0 0 1px rgba(var(--accent-rgb),0.22), 0 14px 36px -16px rgba(var(--accent-rgb),0.40), var(--shadow-card)"
+          : "var(--shadow-card)",
+        transition:"border-color 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium), transform 240ms var(--ease-premium)",
+        transform: active ? "translateY(-1px)" : "none",
+        position:"relative",
+        ...style,
+      }}
+    >
+      <div style={contentStyle}>{children}</div>
+
+      <div aria-hidden={!active} role="note" style={{
+        overflow:"hidden",
+        maxHeight: active ? 220 : 0,
+        opacity: active ? 1 : 0,
+        marginTop: active ? 16 : 0,
+        transition:"max-height 320ms var(--ease-premium), opacity 220ms ease, margin-top 320ms var(--ease-premium)",
+      }}>
+        <div style={{
+          borderTop:"1px dashed var(--cal-border)", paddingTop:13,
+          display:"flex", gap:10, alignItems:"flex-start",
+        }}>
+          {INFO_ICON}
+          <div style={{ minWidth:0 }}>
+            <strong style={{ display:"block", fontSize:12.5, fontWeight:700, color:"var(--accent)", marginBottom:3, letterSpacing:"0.01em" }}>
+              {title}
+            </strong>
+            <p style={{ fontSize:12.5, lineHeight:1.55, color:"var(--text-secondary)", fontWeight:500 }}>
+              {hint}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Globo flotante compartido (posición fija para no recortarse dentro de modales/scroll).
+type HintRect = { x: number; top: number; bottom: number };
+function FloatingTip({ rect, hint, title }: { rect: HintRect; hint: string; title?: string }) {
+  const placeBelow = rect.top < 170;
+  return (
+    <span role="tooltip" className="animate-fade-in" style={{
+      position:"fixed",
+      left: Math.min(Math.max(rect.x, 144), (typeof window !== "undefined" ? window.innerWidth : 1024) - 144),
+      top: placeBelow ? rect.bottom + 10 : rect.top - 10,
+      transform: placeBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+      width:268, maxWidth:"calc(100vw - 24px)",
+      padding:"12px 14px", borderRadius:11,
+      background:"var(--menu-bg)",
+      border:"1px solid rgba(var(--accent-rgb),0.30)",
+      boxShadow:"var(--shadow-dropdown)",
+      zIndex:900, pointerEvents:"none", textAlign:"left", whiteSpace:"normal",
+      display:"flex", gap:10, alignItems:"flex-start",
+    }}>
+      {INFO_ICON}
+      <span style={{ minWidth:0 }}>
+        {title && (
+          <strong style={{ display:"block", color:"var(--accent)", fontWeight:700, marginBottom:3, fontSize:12.5, letterSpacing:"0.01em" }}>
+            {title}
+          </strong>
+        )}
+        <span style={{ display:"block", color:"var(--text-secondary)", fontSize:12.5, lineHeight:1.55, fontWeight:500, fontFamily:"var(--font-sans)" }}>
+          {hint}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+// Hook de hover/focus que calcula la posición del control al activarse.
+function useHintRect() {
+  const [rect, setRect] = useState<HintRect | null>(null);
+  const ref = useRef<HTMLElement>(null);
   const open = useCallback(() => {
     const r = ref.current?.getBoundingClientRect();
     if (r) setRect({ x: r.left + r.width / 2, top: r.top, bottom: r.bottom });
   }, []);
   const close = useCallback(() => setRect(null), []);
-
-  // Si el usuario hace scroll, ocultamos para que el globo no quede flotando lejos del punto
   useEffect(() => {
     if (!rect) return;
     const h = () => close();
@@ -406,62 +505,63 @@ function HelpHint({ text, title, label = "Más información" }: { text: string; 
     window.addEventListener("resize", h);
     return () => { window.removeEventListener("scroll", h, true); window.removeEventListener("resize", h); };
   }, [rect, close]);
+  return { rect, ref, open, close };
+}
 
-  const placeBelow = rect ? rect.top < 150 : false;
-
+// Envuelve un control (botón, filtro, grupo) y revela un globo flotante al hacer hover/focus.
+function HintZone({
+  hint, title, children, style,
+}: {
+  hint: string; title?: string; children: React.ReactNode; style?: React.CSSProperties;
+}) {
+  const { rect, ref, open, close } = useHintRect();
   return (
-    <span style={{ display:"inline-flex", position:"relative" }}>
-      <button
-        ref={ref}
-        type="button"
-        aria-label={label}
-        onMouseEnter={open}
-        onMouseLeave={close}
-        onFocus={open}
-        onBlur={close}
-        onClick={e => { e.preventDefault(); e.stopPropagation(); }}
-        style={{
-          width:18, height:18, borderRadius:"50%", flexShrink:0,
-          display:"inline-flex", alignItems:"center", justifyContent:"center",
-          border:"1px solid var(--cal-border)",
-          background:"var(--cal-cell-bg)",
-          color: rect ? "var(--accent)" : "var(--text-muted)",
-          borderColor: rect ? "rgba(var(--accent-rgb),0.45)" : "var(--cal-border)",
-          fontSize:11, fontWeight:700, fontFamily:"var(--font-sans)",
-          cursor:"help", padding:0, lineHeight:1,
-          boxShadow:"var(--shadow-btn)",
-          transition:"color 160ms, border-color 160ms, background 160ms",
-        }}
-      >
-        ?
-      </button>
-
-      {rect && (
-        <span role="tooltip" className="animate-fade-in" style={{
-          position:"fixed",
-          left: Math.min(Math.max(rect.x, 144), (typeof window !== "undefined" ? window.innerWidth : 1024) - 144),
-          top: placeBelow ? rect.bottom + 9 : rect.top - 9,
-          transform: placeBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
-          width:264, maxWidth:"calc(100vw - 24px)",
-          padding:"11px 13px", borderRadius:10,
-          background:"var(--menu-bg)",
-          border:"1px solid var(--cal-border)",
-          boxShadow:"var(--shadow-dropdown)",
-          color:"var(--text-secondary)",
-          fontSize:12.5, lineHeight:1.55, fontWeight:500,
-          fontFamily:"var(--font-sans)", letterSpacing:"0.005em",
-          zIndex:700, pointerEvents:"none", textAlign:"left",
-          whiteSpace:"normal",
-        }}>
-          {title && (
-            <strong style={{ display:"block", color:"var(--text-primary)", fontWeight:700, marginBottom:3, fontSize:12.5 }}>
-              {title}
-            </strong>
-          )}
-          {text}
-        </span>
-      )}
+    <span
+      ref={ref as React.RefObject<HTMLSpanElement>}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      onMouseDown={close}
+      onFocus={open}
+      onBlur={e => { if (!ref.current?.contains(e.relatedTarget as Node)) close(); }}
+      style={{
+        display:"inline-flex", alignItems:"center", position:"relative", borderRadius:12,
+        boxShadow: rect ? "0 0 0 3px rgba(var(--accent-rgb),0.20)" : "0 0 0 0 transparent",
+        transition:"box-shadow 220ms var(--ease-premium)",
+        ...style,
+      }}
+    >
+      {children}
+      {rect && <FloatingTip rect={rect} hint={hint} title={title} />}
     </span>
+  );
+}
+
+// Etiqueta de campo (modales) que se subraya, se ilumina y muestra el globo al hacer hover/focus.
+function HintLabel({
+  children, hint, title, htmlFor, style,
+}: {
+  children: React.ReactNode; hint: string; title?: string; htmlFor?: string; style?: React.CSSProperties;
+}) {
+  const { rect, ref, open, close } = useHintRect();
+  return (
+    <label
+      ref={ref as React.RefObject<HTMLLabelElement>}
+      htmlFor={htmlFor}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      onMouseDown={close}
+      style={{
+        ...style, position:"relative", cursor:"help", width:"fit-content",
+        textDecoration:"underline", textDecorationStyle:"dotted",
+        textDecorationColor: rect ? "var(--accent)" : "rgba(var(--accent-rgb),0.45)",
+        textUnderlineOffset:"3px",
+        color: rect ? "var(--accent)" : (style?.color ?? "var(--text-secondary)"),
+        transition:"color 180ms, text-decoration-color 180ms",
+      }}
+    >
+      {children}
+      {rect && <FloatingTip rect={rect} hint={hint} title={title} />}
+    </label>
   );
 }
 
@@ -1115,7 +1215,11 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
               <div>
-                <label htmlFor="pub-title" style={labelStyle}>Título</label>
+                <HintLabel htmlFor="pub-title" style={labelStyle}
+                  title="Título"
+                  hint="Identifica la publicación dentro del calendario. No se publica en LinkedIn; es solo para que tú la reconozcas.">
+                  Título
+                </HintLabel>
                 <input id="pub-title" style={inputStyle} value={title}
                   onChange={e => setTitle(e.target.value)} placeholder="Título del post…"
                   autoFocus onFocus={onFocus} onBlur={onBlur} />
@@ -1123,14 +1227,22 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
               <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:12, alignItems:"end" }}>
                 <div>
-                  <label style={labelStyle}>Fechas</label>
+                  <HintLabel style={labelStyle}
+                    title="Fechas"
+                    hint="Define el rango en que va la publicación. Puede ser un solo día o varios; en el calendario se ve como una barra que abarca esos días.">
+                    Fechas
+                  </HintLabel>
                   <DateRangePicker
                     startDate={sDate} endDate={eDate}
                     onChangeStart={setSDate} onChangeEnd={setEDate}
                   />
                 </div>
                 <div>
-                  <label htmlFor="pub-country" style={labelStyle}>País</label>
+                  <HintLabel htmlFor="pub-country" style={labelStyle}
+                    title="País / mercado"
+                    hint="El mercado de la publicación. Define la bandera y el color en el calendario, y orienta la búsqueda de perfiles ICP en Apollo.">
+                    País
+                  </HintLabel>
                   <select id="pub-country" style={{ ...inputStyle, cursor:"pointer", minWidth:130 }} value={country}
                     onChange={e => setCountry(e.target.value as CountryKey)}
                     onFocus={onFocus} onBlur={onBlur}>
@@ -1142,7 +1254,11 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
               </div>
 
               <div>
-                <label htmlFor="pub-category" style={labelStyle}>Producto</label>
+                <HintLabel htmlFor="pub-category" style={labelStyle}
+                  title="Producto (ICP)"
+                  hint="El producto de Truora que promueve el post. Con él y el país se buscan los perfiles de cliente ideal en Apollo cuando guardas la tarjeta.">
+                  Producto
+                </HintLabel>
                 <select id="pub-category" style={{ ...inputStyle, cursor:"pointer" }} value={category}
                   onChange={e => setCategory(e.target.value as ProductCategory)}
                   onFocus={onFocus} onBlur={onBlur}>
@@ -1153,12 +1269,20 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
               </div>
 
               <div>
-                <label style={labelStyle}>Personas</label>
+                <HintLabel style={labelStyle}
+                  title="Personas"
+                  hint="Quiénes firman o aparecen en la publicación. Se muestran como avatares en la tarjeta del calendario. Puedes elegir de la lista o añadir a alguien nuevo.">
+                  Personas
+                </HintLabel>
                 <PeopleInput people={people} onChange={setPeople} />
               </div>
 
               <div>
-                <label htmlFor="pub-content" style={labelStyle}>Contenido de LinkedIn</label>
+                <HintLabel htmlFor="pub-content" style={labelStyle}
+                  title="Contenido de LinkedIn"
+                  hint="El texto que se publicará en LinkedIn. Puedes escribirlo aquí, o generarlo con IA y el tono del autor desde la pestaña “Crea tu post”.">
+                  Contenido de LinkedIn
+                </HintLabel>
                 <textarea id="pub-content"
                   style={{ ...inputStyle, minHeight:100, resize:"vertical", lineHeight:1.65 }}
                   value={content} onChange={e => setContent(e.target.value)}
@@ -1173,6 +1297,10 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
           {isView ? (
             <>
               <div style={{ display:"flex", gap:10 }}>
+                <HintZone
+                  style={{ flex:1 }}
+                  title="Publicar en LinkedIn"
+                  hint="Copia el contenido al portapapeles y abre LinkedIn en una pestaña nueva, listo para pegar y publicar.">
                 <button type="button" onClick={handlePostLinkedIn}
                   className="ripple-effect hover-lift"
                   style={{
@@ -1193,7 +1321,12 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                   </svg>
                   {copied ? "¡Copiado! Pega en LinkedIn" : "Publicar en LinkedIn"}
                 </button>
+                </HintZone>
 
+                <HintZone
+                  style={{ flex:1 }}
+                  title="Generar post con IA"
+                  hint="Abre “Crea tu post” con esta tarjeta ya vinculada, para redactar el contenido con IA usando su país y enfoque.">
                 <button type="button"
                   onClick={() => { onGoToCreate(existing!.id); }}
                   className="ripple-effect hover-lift"
@@ -1211,6 +1344,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                 >
                   ✦ Generar post
                 </button>
+                </HintZone>
               </div>
 
               <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
@@ -1402,7 +1536,11 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
         <div style={{ padding:"18px 24px", display:"flex", flexDirection:"column", gap:14 }}>
           {/* person */}
           <div>
-            <label style={labelSt}>Persona</label>
+            <HintLabel style={labelSt}
+              title="Persona"
+              hint="Elige a quién pertenece este tono, o crea uno nuevo. El perfil queda asociado a esa persona para reutilizarlo al generar posts.">
+              Persona
+            </HintLabel>
             <select style={{ ...inputSt, cursor:"pointer" }} value={person}
               onChange={e=>setPerson(e.target.value)} onFocus={onFocus} onBlur={onBlur}>
               <option value="">Selecciona una persona…</option>
@@ -1424,7 +1562,11 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
 
           {/* linkedin url */}
           <div>
-            <label style={labelSt}>URL de LinkedIn (opcional)</label>
+            <HintLabel style={labelSt}
+              title="URL de LinkedIn"
+              hint="El perfil de la persona (opcional). Sirve como referencia y para abrir su LinkedIn rápido; no es obligatorio para analizar el tono.">
+              URL de LinkedIn (opcional)
+            </HintLabel>
             <div style={{ display:"flex", gap:8 }}>
               <input style={{ ...inputSt, flex:1 }} value={url}
                 onChange={e=>setUrl(e.target.value)}
@@ -1450,7 +1592,11 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
 
           {/* sample posts */}
           <div>
-            <label style={labelSt}>Posts de LinkedIn{saved ? " (actualizar)" : ""}</label>
+            <HintLabel style={labelSt}
+              title="Posts de ejemplo"
+              hint="Pega 3-5 publicaciones reales de la persona, separadas con ---. De aquí se aprende su estilo: emojis, hashtags, preguntas, listas y longitud típica.">
+              Posts de LinkedIn{saved ? " (actualizar)" : ""}
+            </HintLabel>
             <textarea style={{ ...inputSt, minHeight:160, resize:"vertical", lineHeight:1.65, fontSize:13 }}
               value={sample} onChange={e=>setSample(e.target.value)}
               placeholder={"Pega aquí 3-5 posts reales de LinkedIn.\nSepara cada post con ---\n\nEjemplo:\nMi primer post aquí...\n---\nOtro post aquí..."}
@@ -1614,9 +1760,12 @@ function SavePostModal({
         {/* body */}
         <div style={{ padding:"20px 24px" }}>
           {/* person selector */}
-          <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}>
+          <HintLabel
+            style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}
+            title="¿Para quién es?"
+            hint="Si eliges una persona, el post se archiva en su historial de borradores. “Solo guardar” lo guarda sin asociarlo a nadie.">
             ¿Para quién es este post?
-          </label>
+          </HintLabel>
           <select
             value={savePerson}
             onChange={e => setSavePerson(e.target.value)}
@@ -1634,9 +1783,12 @@ function SavePostModal({
           </select>
 
           {/* preview */}
-          <label style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}>
+          <HintLabel
+            style={{ display:"block", marginBottom:6, fontSize:13, fontWeight:600, color:"var(--text-secondary)" }}
+            title="Vista previa"
+            hint="Un adelanto del texto que se va a guardar (recortado). Así confirmas el contenido antes de archivarlo.">
             Vista previa
-          </label>
+          </HintLabel>
           <div style={{
             padding:"14px 16px", borderRadius:12, marginBottom:20,
             background:"var(--cal-section-bg)",
@@ -1809,7 +1961,11 @@ function SuggestedAccountsModal({ category, country, publicationId, onChangeCate
             ICP según el tema del post · País: <strong>{countryLabel}</strong> · vía Apollo (sin créditos)
           </p>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <label htmlFor="sg-cat" style={{ fontSize:12, fontWeight:700, color:"var(--text-primary)" }}>Tema</label>
+            <HintLabel htmlFor="sg-cat" style={{ fontSize:12, fontWeight:700, color:"var(--text-primary)" }}
+              title="Tema / producto ICP"
+              hint="Cambia el producto para ajustar a qué cliente ideal apuntan los perfiles sugeridos. Apollo se vuelve a consultar al cambiarlo (sin gastar créditos).">
+              Tema
+            </HintLabel>
             <select id="sg-cat" value={category} onChange={e=>onChangeCategory(e.target.value)} style={{
               flex:1, padding:"9px 12px", borderRadius:9, cursor:"pointer",
               border:"1px solid var(--cal-border)", background:"var(--cal-urlbar-bg)",
@@ -2064,13 +2220,10 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
         }}>
 
           {/* ── STEP 1: Calendar link ── */}
-          <div style={{
-            background:"var(--card-bg)",
-            border:"1px solid var(--card-border)",
-            borderRadius:16,
-            padding:"22px 24px",
-            boxShadow:"var(--shadow-card)",
-          }}>
+          <HelpCard
+            title="Vincular al calendario"
+            hint="Conecta este post con una tarjeta ya programada. Así el país y el enfoque del mensaje se autocompletan según lo que planificaste, y el post queda asociado a esa fecha."
+          >
             <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
               <IconTile>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -2081,11 +2234,6 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Relacionar con el calendario
               </span>
-              <HelpHint
-                label="¿Para qué vincular al calendario?"
-                title="Vincular al calendario"
-                text="Conecta este post con una tarjeta ya programada. Así el país y el enfoque del mensaje se autocompletan según lo que planificaste, y el post queda asociado a esa fecha."
-              />
               <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-muted)", fontWeight:500 }}>opcional</span>
             </div>
             <select
@@ -2122,15 +2270,13 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 </div>
               </div>
             )}
-          </div>
+          </HelpCard>
 
           {/* ── STEP 2: Topic ── */}
-          <div style={{
-            background:"var(--card-bg)",
-            border:"1px solid var(--card-border)",
-            borderRadius:16, padding:"22px 24px",
-            boxShadow:"var(--shadow-card)",
-          }}>
+          <HelpCard
+            title="Tema del post"
+            hint="Resume en una frase de qué trata la publicación. Es la base que la IA usa para redactar el borrador, así que entre más claro el tema, mejor el resultado."
+          >
             <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
               <IconTile>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -2140,11 +2286,6 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Describe el tema
               </span>
-              <HelpHint
-                label="¿Qué escribo en el tema?"
-                title="Tema del post"
-                text="Resume en una frase de qué trata la publicación. Es la base que la IA usa para redactar el borrador, así que entre más claro el tema, mejor el resultado."
-              />
             </div>
             <textarea
               rows={3}
@@ -2153,16 +2294,14 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               placeholder="Ej: El crecimiento de fintech en Colombia durante el primer trimestre de 2026…"
               onFocus={onFocusFn} onBlur={onBlurFn}
             />
-          </div>
+          </HelpCard>
 
           {/* ── STEP 3: Config ── */}
-          <div style={{
-            background:"var(--card-bg)",
-            border:"1px solid var(--card-border)",
-            borderRadius:16, padding:"22px 24px",
-            boxShadow:"var(--shadow-card)",
-            display:"flex", flexDirection:"column", gap:20,
-          }}>
+          <HelpCard
+            title="Estilo del contenido"
+            hint="Define idioma, extensión, tono y enfoque del mensaje. La IA adapta el borrador a estas opciones. Si eliges un autor con tono personal, el tono lo define su perfil."
+            contentStyle={{ display:"flex", flexDirection:"column", gap:20 }}
+          >
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <IconTile>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -2175,11 +2314,6 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Ajusta el estilo
               </span>
-              <HelpHint
-                label="¿Qué controla el estilo?"
-                title="Estilo del contenido"
-                text="Define idioma, extensión, tono y enfoque del mensaje. La IA adapta el borrador a estas opciones. Si eliges un autor con tono personal, el tono lo define su perfil."
-              />
             </div>
 
             {/* row: idioma + extensión */}
@@ -2224,15 +2358,13 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 {FOCUS_OPTIONS.map(f=><option key={f}>{f}</option>)}
               </select>
             </div>
-          </div>
+          </HelpCard>
 
           {/* ── STEP 4: Author / tone ── */}
-          <div style={{
-            background:"var(--card-bg)",
-            border:"1px solid var(--card-border)",
-            borderRadius:16, padding:"22px 24px",
-            boxShadow:"var(--shadow-card)",
-          }}>
+          <HelpCard
+            title="Tono personal del autor"
+            hint="Elige quién firma el post y se redactará imitando su estilo real de LinkedIn (emojis, hashtags, longitud, forma de escribir). Usa “Adaptar tono” para crear el perfil pegando sus publicaciones."
+          >
             <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
               <IconTile>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -2242,11 +2374,6 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Autor y tono personal
               </span>
-              <HelpHint
-                label="¿Qué es el tono personal?"
-                title="Tono personal del autor"
-                text="Elige quién firma el post y se redactará imitando su estilo real de LinkedIn (emojis, hashtags, longitud, forma de escribir). Usa “Adaptar tono” para crear el perfil pegando sus publicaciones."
-              />
               <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-secondary)", fontWeight:500 }}>opcional</span>
             </div>
             <p style={{ fontSize:13, color:"var(--text-secondary)", margin:"-6px 0 14px", lineHeight:1.5 }}>
@@ -2319,7 +2446,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 ))}
               </div>
             )}
-          </div>
+          </HelpCard>
 
           {/* generate btn */}
           <button type="button" onClick={handleGenerate}
@@ -2500,29 +2627,27 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 <span style={{ fontSize:12, color:"var(--status-error)", fontWeight:600 }}>Cerca del límite</span>
               )}
               {generated && (
-                <button type="button" onClick={()=>setShowSuggest(true)} style={{
-                  height:30, padding:"0 12px", borderRadius:8,
-                  border:"1px solid var(--cal-border)", background:"var(--cal-cell-bg)",
-                  color:"var(--text-secondary)", fontSize:12, fontWeight:600,
-                  fontFamily:"var(--font-sans)", cursor:"pointer", display:"flex", alignItems:"center", gap:6,
-                }}>
-                  👥 Perfiles para seguir
-                </button>
-              )}
-              {generated && (
-                <HelpHint
-                  label="¿Qué son los perfiles para seguir?"
+                <HintZone
                   title="Perfiles ICP · vía Apollo"
-                  text="Sugiere cuentas y personas de tu cliente ideal (ICP) para interactuar, según el producto y el país del post. Consulta Apollo sin gastar créditos."
-                />
+                  hint="Sugiere cuentas y personas de tu cliente ideal (ICP) para interactuar, según el producto y el país del post. Consulta Apollo sin gastar créditos."
+                >
+                  <button type="button" onClick={()=>setShowSuggest(true)} style={{
+                    height:30, padding:"0 12px", borderRadius:8,
+                    border:"1px solid var(--cal-border)", background:"var(--cal-cell-bg)",
+                    color:"var(--text-secondary)", fontSize:12, fontWeight:600,
+                    fontFamily:"var(--font-sans)", cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                  }}>
+                    👥 Perfiles para seguir
+                  </button>
+                </HintZone>
               )}
             </div>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-              <HelpHint
-                label="¿Guardar o publicar?"
+              <HintZone
                 title="Guardar y publicar"
-                text="Guardar post lo archiva como borrador (queda en el historial del autor). Publicar en LinkedIn copia el texto y abre LinkedIn listo para pegar y publicar."
-              />
+                hint="Guardar post lo archiva como borrador (queda en el historial del autor). Publicar en LinkedIn copia el texto y abre LinkedIn listo para pegar y publicar."
+                style={{ gap:8 }}
+              >
               <button type="button" onClick={()=>setShowSave(true)} disabled={!generated}
                 className="ripple-effect hover-lift"
                 style={{
@@ -2563,6 +2688,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 </svg>
                 Publicar en LinkedIn
               </button>
+              </HintZone>
             </div>
           </div>
         </div>
@@ -2821,6 +2947,10 @@ export default function CalendarPage() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent)" style={{ flexShrink:0 }}>
               <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
             </svg>
+            <HintZone
+              title="Las dos vistas"
+              hint="Calendario: planifica y visualiza tus publicaciones por país y fecha. Crea tu post: redacta el contenido con ayuda de IA y el tono de cada autor."
+            >
             <div style={{ display:"flex", gap:3, background:"var(--cal-cell-bg)", borderRadius:12, padding:4, border:"1px solid var(--cal-border)" }}>
               {([
                 { id:"calendar" as const, label:"Calendario",      icon:<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> },
@@ -2843,32 +2973,28 @@ export default function CalendarPage() {
                 </button>
               ))}
             </div>
-            <HelpHint
-              label="¿Qué hace cada pestaña?"
-              title="Las dos vistas"
-              text="Calendario: planifica y visualiza tus publicaciones por país y fecha. Crea tu post: redacta el contenido con ayuda de IA y el tono de cada autor."
-            />
+            </HintZone>
           </div>
 
           {/* Right controls */}
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             {activeTab === "calendar" && (
               <>
-                <GlassBtn onClick={() => setModal({ mode:"create", date:todayStr })} accent>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                  Nuevo post
-                </GlassBtn>
-                <HelpHint
-                  label="¿Qué es Nuevo post?"
+                <HintZone
                   title="Nuevo post"
-                  text="Abre una tarjeta para programar una publicación: título, contenido, país, producto, fechas y las personas que la firman. También puedes hacer clic en cualquier día del calendario."
-                />
-                <CountryDropdown selected={filter} onChange={setFilter} />
-                <HelpHint
-                  label="¿Qué hace el filtro de país?"
+                  hint="Abre una tarjeta para programar una publicación: título, contenido, país, producto, fechas y las personas que la firman. También puedes hacer clic en cualquier día del calendario."
+                >
+                  <GlassBtn onClick={() => setModal({ mode:"create", date:todayStr })} accent>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    Nuevo post
+                  </GlassBtn>
+                </HintZone>
+                <HintZone
                   title="Filtro por mercado"
-                  text="Muestra solo las publicaciones de un país. Elige LATAM para ver todos los mercados a la vez. El país siempre se acompaña de su bandera y nombre."
-                />
+                  hint="Muestra solo las publicaciones de un país. Elige LATAM para ver todos los mercados a la vez. El país siempre se acompaña de su bandera y nombre."
+                >
+                  <CountryDropdown selected={filter} onChange={setFilter} />
+                </HintZone>
               </>
             )}
             <GlassBtn onClick={() => setDark(!dark)} small aria-label={dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
@@ -2903,6 +3029,11 @@ export default function CalendarPage() {
             </h1>
 
             {/* Arrow buttons — same style as the screenshot */}
+            <HintZone
+              style={{ alignSelf:"center" }}
+              title="Navegación"
+              hint="Cambia de mes con las flechas o con las teclas ← →. Haz clic en cualquier día para programar una publicación en esa fecha; pulsa N para crear una nueva."
+            >
             <div style={{ display:"flex", gap:6, alignSelf:"center", marginTop:2 }}>
               {[
                 { fn: prevMonth, label:"Mes anterior",  d:"M7 1L1 6.5L7 12" },
@@ -2933,11 +3064,7 @@ export default function CalendarPage() {
                 </button>
               ))}
             </div>
-            <HelpHint
-              label="¿Cómo navego el calendario?"
-              title="Navegación"
-              text="Cambia de mes con las flechas o con las teclas ← →. Haz clic en cualquier día para programar una publicación en esa fecha; pulsa N para crear una nueva."
-            />
+            </HintZone>
           </div>
         </div>
 
