@@ -178,9 +178,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "No topic provided" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ ok: false, error: "OpenAI API key not configured" }, { status: 500 });
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+    if (!anthropicKey && !openaiKey) {
+      return NextResponse.json({ ok: false, error: "No hay API key configurada (ANTHROPIC_API_KEY u OPENAI_API_KEY)" }, { status: 500 });
     }
 
     const lengthHint =
@@ -225,11 +226,42 @@ Entrega solo el post final, listo para publicar. Sin explicaciones ni comentario
 
 IMPORTANTE: El hook va en la primera línea, solo, seguido de una línea en blanco antes del cuerpo. No lo pegues al resto del texto.`;
 
+    // Prefiere Claude (Anthropic) si hay key; si no, cae a OpenAI GPT-4o.
+    if (anthropicKey) {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+          max_tokens: 1200,
+          temperature: 0.75,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return NextResponse.json({ ok: false, error: err }, { status: res.status });
+      }
+
+      const data = await res.json();
+      const content =
+        Array.isArray(data.content)
+          ? data.content.filter((b: { type?: string }) => b.type === "text").map((b: { text?: string }) => b.text ?? "").join("")
+          : "";
+      return NextResponse.json({ ok: true, content });
+    }
+
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-4o",

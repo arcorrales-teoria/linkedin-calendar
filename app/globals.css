@@ -14,6 +14,10 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
 
+  /* ── Motion (premium spring-like easing) ── */
+  --ease-premium: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-soft:    cubic-bezier(0.16, 1, 0.3, 1);
+
   /* ── Z-index scale ── */
   --z-bg: 0;
   --z-base: 10;
@@ -54,11 +58,11 @@
   --btn-bg:             #ffffff;
   --tab-active-bg:      #ffffff;
 
-  --shadow-btn:      0 1px 2px rgba(22, 18, 44, 0.08), inset 0 1px 0 rgba(255,255,255,0.85);
-  --shadow-card:     0 1px 2px rgba(22, 18, 44, 0.05), 0 0 0 1px rgba(255,255,255,0.55) inset;
-  --shadow-window:   0 24px 64px rgba(20, 16, 44, 0.18), 0 4px 16px rgba(20, 16, 44, 0.08);
-  --shadow-modal:    0 24px 64px rgba(20, 16, 44, 0.22), 0 8px 24px rgba(20, 16, 44, 0.10);
-  --shadow-dropdown: 0 12px 32px rgba(20, 16, 44, 0.14), 0 2px 8px rgba(20, 16, 44, 0.08);
+  --shadow-btn:      0 1px 1px rgba(22,18,44,0.04), 0 2px 5px rgba(22,18,44,0.06), inset 0 1px 0 rgba(255,255,255,0.85);
+  --shadow-card:     0 1px 2px rgba(22,18,44,0.04), 0 8px 20px -10px rgba(22,18,44,0.12), 0 0 0 1px rgba(255,255,255,0.55) inset;
+  --shadow-window:   0 2px 8px rgba(20,16,44,0.04), 0 12px 32px rgba(20,16,44,0.08), 0 40px 84px -20px rgba(20,16,44,0.22);
+  --shadow-modal:    0 4px 12px rgba(20,16,44,0.06), 0 18px 44px rgba(20,16,44,0.13), 0 44px 100px -24px rgba(20,16,44,0.28);
+  --shadow-dropdown: 0 2px 6px rgba(20,16,44,0.05), 0 12px 30px rgba(20,16,44,0.12), 0 22px 52px -18px rgba(20,16,44,0.16);
 
   --cal-window-bg:     #faf9fc;
   --cal-titlebar-bg:   #f5f4f8;
@@ -116,11 +120,11 @@
   --btn-bg:             #1a1822;
   --tab-active-bg:      #232030;
 
-  --shadow-btn:      0 1px 2px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
-  --shadow-card:     0 1px 2px rgba(0,0,0,0.35);
-  --shadow-window:   0 32px 80px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35);
-  --shadow-modal:    0 32px 80px rgba(0,0,0,0.60), 0 8px 24px rgba(0,0,0,0.40);
-  --shadow-dropdown: 0 16px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.40);
+  --shadow-btn:      0 1px 2px rgba(0,0,0,0.40), 0 2px 6px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06);
+  --shadow-card:     0 1px 2px rgba(0,0,0,0.35), 0 10px 26px -12px rgba(0,0,0,0.60);
+  --shadow-window:   0 4px 16px rgba(0,0,0,0.38), 0 18px 44px rgba(0,0,0,0.46), 0 44px 100px -22px rgba(0,0,0,0.66);
+  --shadow-modal:    0 8px 24px rgba(0,0,0,0.44), 0 22px 60px rgba(0,0,0,0.56), 0 52px 116px -26px rgba(0,0,0,0.72);
+  --shadow-dropdown: 0 4px 12px rgba(0,0,0,0.44), 0 16px 40px rgba(0,0,0,0.56), 0 26px 60px -20px rgba(0,0,0,0.56);
 
   --cal-window-bg:     #0e0d13;
   --cal-titlebar-bg:   #121016;
@@ -150,6 +154,8 @@
 
 html {
   height: 100%;
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -162,9 +168,16 @@ body {
 }
 
 ::selection { background: var(--accent); color: var(--accent-text); }
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background 200ms var(--ease-premium);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: padding-box; }
 
 /* Keyboard focus is always visible. Elements that paint their own ring
    (inputs with the accent box-shadow) set outline:none inline. */
@@ -188,21 +201,24 @@ body {
 }
 
 .hover-lift {
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 140ms ease;
+  transition: transform 320ms var(--ease-premium),
+              box-shadow 320ms var(--ease-premium),
+              opacity 160ms ease;
 }
-.hover-lift:hover { transform: translateY(-1px); }
+.hover-lift:hover { transform: translateY(-2px); }
 
-/* Press feedback: a quiet settle, not a flash */
+/* Press feedback: physical settle on press */
 .ripple-effect { position: relative; }
-.ripple-effect:active { transform: translateY(0) scale(0.985); }
+.ripple-effect:active {
+  transform: translateY(0) scale(0.97);
+  transition: transform 120ms var(--ease-premium);
+}
 
 /* ── Keyframes ───────────────────────────────────────────────────────────────── */
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(14px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(18px) scale(0.985); filter: blur(3px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-4px); }
@@ -221,10 +237,10 @@ body {
   to   { transform: rotate(360deg); }
 }
 
-.animate-slide-up { animation: slideUp 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-fade-in  { animation: fadeIn  140ms ease-out both; }
-.animate-backdrop { animation: backdropIn 180ms ease-out both; }
-.animate-toast-in { animation: toastIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-up { animation: slideUp 440ms var(--ease-premium) both; }
+.animate-fade-in  { animation: fadeIn  200ms var(--ease-premium) both; }
+.animate-backdrop { animation: backdropIn 260ms ease-out both; }
+.animate-toast-in { animation: toastIn 360ms var(--ease-premium) both; }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────────── */
 

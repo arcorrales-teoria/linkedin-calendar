@@ -17,6 +17,12 @@ interface Country {
   bgDark: string;
 }
 
+// Productos de Truora; cada uno define el ICP que se busca en Apollo.
+const PRODUCT_CATEGORIES = [
+  "Digital Identity", "Background Checks", "WA Onboarding", "WA Banking", "WA Agentic",
+] as const;
+type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+
 interface Publication {
   id: string;
   startDate: string;
@@ -24,6 +30,7 @@ interface Publication {
   title: string;
   content: string;
   country: CountryKey;
+  category?: ProductCategory; // producto seleccionado al crear la tarjeta; dispara la búsqueda en Apollo
   people: string[];
 }
 
@@ -376,6 +383,88 @@ function IconTile({ children, size = 38 }: { children: React.ReactNode; size?: n
   );
 }
 
+// ── HelpHint — small "?" dot that reveals a tooltip on hover / focus ──────────
+// Nada aparece al entrar: solo una bolita discreta. Al pasar el cursor (o con el
+// teclado) muestra qué hace cada herramienta. Posición fija para no recortarse
+// dentro de paneles con scroll.
+
+function HelpHint({ text, title, label = "Más información" }: { text: string; title?: string; label?: string }) {
+  const [rect, setRect] = useState<{ x: number; top: number; bottom: number } | null>(null);
+  const ref = useRef<HTMLButtonElement>(null);
+
+  const open = useCallback(() => {
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setRect({ x: r.left + r.width / 2, top: r.top, bottom: r.bottom });
+  }, []);
+  const close = useCallback(() => setRect(null), []);
+
+  // Si el usuario hace scroll, ocultamos para que el globo no quede flotando lejos del punto
+  useEffect(() => {
+    if (!rect) return;
+    const h = () => close();
+    window.addEventListener("scroll", h, true);
+    window.addEventListener("resize", h);
+    return () => { window.removeEventListener("scroll", h, true); window.removeEventListener("resize", h); };
+  }, [rect, close]);
+
+  const placeBelow = rect ? rect.top < 150 : false;
+
+  return (
+    <span style={{ display:"inline-flex", position:"relative" }}>
+      <button
+        ref={ref}
+        type="button"
+        aria-label={label}
+        onMouseEnter={open}
+        onMouseLeave={close}
+        onFocus={open}
+        onBlur={close}
+        onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+        style={{
+          width:18, height:18, borderRadius:"50%", flexShrink:0,
+          display:"inline-flex", alignItems:"center", justifyContent:"center",
+          border:"1px solid var(--cal-border)",
+          background:"var(--cal-cell-bg)",
+          color: rect ? "var(--accent)" : "var(--text-muted)",
+          borderColor: rect ? "rgba(var(--accent-rgb),0.45)" : "var(--cal-border)",
+          fontSize:11, fontWeight:700, fontFamily:"var(--font-sans)",
+          cursor:"help", padding:0, lineHeight:1,
+          boxShadow:"var(--shadow-btn)",
+          transition:"color 160ms, border-color 160ms, background 160ms",
+        }}
+      >
+        ?
+      </button>
+
+      {rect && (
+        <span role="tooltip" className="animate-fade-in" style={{
+          position:"fixed",
+          left: Math.min(Math.max(rect.x, 144), (typeof window !== "undefined" ? window.innerWidth : 1024) - 144),
+          top: placeBelow ? rect.bottom + 9 : rect.top - 9,
+          transform: placeBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+          width:264, maxWidth:"calc(100vw - 24px)",
+          padding:"11px 13px", borderRadius:10,
+          background:"var(--menu-bg)",
+          border:"1px solid var(--cal-border)",
+          boxShadow:"var(--shadow-dropdown)",
+          color:"var(--text-secondary)",
+          fontSize:12.5, lineHeight:1.55, fontWeight:500,
+          fontFamily:"var(--font-sans)", letterSpacing:"0.005em",
+          zIndex:700, pointerEvents:"none", textAlign:"left",
+          whiteSpace:"normal",
+        }}>
+          {title && (
+            <strong style={{ display:"block", color:"var(--text-primary)", fontWeight:700, marginBottom:3, fontSize:12.5 }}>
+              {title}
+            </strong>
+          )}
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // ── GlassBtn ──────────────────────────────────────────────────────────────────
 
 function GlassBtn({
@@ -542,10 +631,10 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
             <span key={p} style={{
               display:"inline-flex", alignItems:"center", gap:6,
               padding:"4px 8px 4px 10px", borderRadius:20,
-              background:"var(--cal-cell-hover)",
+              background:"var(--cal-cell-bg)",
               border:"1px solid var(--cal-border)",
               fontSize:13, fontWeight:500, color:"var(--text-primary)",
-              boxShadow:"0 1px 4px rgba(0,0,0,0.08)",
+              boxShadow:"0 1px 3px rgba(0,0,0,0.06)",
             }}>
               {p}
               <button type="button" aria-label={`Quitar a ${p}`}
@@ -595,6 +684,25 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
           border:"1px solid var(--cal-border)",
           boxShadow:"var(--shadow-dropdown)",
         }}>
+          <div style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            padding:"7px 8px 7px 14px", borderBottom:"1px solid var(--cal-border)",
+            position:"sticky", top:0, background:"var(--menu-bg)", zIndex:1,
+          }}>
+            <span style={{ fontSize:11, color:"var(--text-muted)", letterSpacing:"0.03em", fontFamily:"var(--font-sans)" }}>
+              {people.length} seleccionado{people.length === 1 ? "" : "s"}
+            </span>
+            <button type="button" onMouseDown={e => { e.preventDefault(); setOpen(false); }}
+              style={{
+                height:28, padding:"0 16px", borderRadius:8,
+                border:"1px solid var(--btn-primary-border)",
+                background:"var(--btn-primary-bg)", color:"var(--btn-primary-text)",
+                fontSize:12.5, fontWeight:700, fontFamily:"var(--font-sans)", cursor:"pointer",
+                boxShadow:"var(--shadow-btn-primary)",
+              }}>
+              Listo
+            </button>
+          </div>
           <div style={{ maxHeight:200, overflowY:"auto" }}>
             {filtered.length === 0 ? (
               <div style={{ padding:"12px 14px", fontSize:13, color:"var(--text-muted)", fontFamily:"var(--font-sans)" }}>
@@ -635,12 +743,6 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
                 </button>
               );
             })}
-          </div>
-          <div style={{
-            padding:"7px 14px", borderTop:"1px solid var(--cal-border)",
-            fontSize:11, color:"var(--text-muted)", fontFamily:"var(--font-sans)", letterSpacing:"0.03em",
-          }}>
-            {people.length} seleccionados · Esc para cerrar
           </div>
         </div>
       )}
@@ -858,6 +960,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
   const [sDate,   setSDate]   = useState(existing?.startDate ?? (state as { date?: string }).date ?? toDateStr(TODAY));
   const [eDate,   setEDate]   = useState(existing?.endDate   ?? (state as { date?: string }).date ?? toDateStr(TODAY));
   const [country, setCountry] = useState<CountryKey>(existing?.country ?? "LATAM");
+  const [category, setCategory] = useState<ProductCategory>(existing?.category ?? "Digital Identity");
   const [people,  setPeople]  = useState<string[]>(existing?.people ?? []);
   const [copied,  setCopied]  = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -872,7 +975,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
   function handleSave() {
     if (!title.trim()) return;
-    onSave({ id: existing?.id ?? uid(), title: title.trim(), content, startDate: sDate, endDate: eDate < sDate ? sDate : eDate, country, people });
+    onSave({ id: existing?.id ?? uid(), title: title.trim(), content, startDate: sDate, endDate: eDate < sDate ? sDate : eDate, country, category, people });
     onClose();
   }
 
@@ -926,7 +1029,9 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
           border:"1px solid var(--cal-border)",
           background:"var(--modal-bg)",
           boxShadow:"var(--shadow-modal)",
-          overflow:"hidden",
+          overflowY:"auto",
+          overflowX:"hidden",
+          maxHeight:"calc(100vh - 40px)",
         }}
       >
         {/* Country accent bar */}
@@ -1034,6 +1139,17 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="pub-category" style={labelStyle}>Producto</label>
+                <select id="pub-category" style={{ ...inputStyle, cursor:"pointer" }} value={category}
+                  onChange={e => setCategory(e.target.value as ProductCategory)}
+                  onFocus={onFocus} onBlur={onBlur}>
+                  {PRODUCT_CATEGORIES.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -1614,6 +1730,153 @@ function SavePostModal({
   );
 }
 
+// ── Suggested accounts (ICP → Apollo) ─────────────────────────────────────────
+
+// Infiere el producto/ICP a partir del contenido del post.
+// Solo es el respaldo para tarjetas viejas sin categoría: las nuevas la traen seleccionada desde el card.
+function inferProduct(text: string): ProductCategory {
+  const t = (text || "").toLowerCase();
+  if (/background|antecedent/.test(t)) return "Background Checks";
+  if (/agentic|agente|\bagent\b|chatbot|\bbot\b/.test(t)) return "WA Agentic";
+  if (/banking|banca|wallet|billetera|cuenta/.test(t)) return "WA Banking";
+  if (/onboarding|registro|alta de usuario/.test(t)) return "WA Onboarding";
+  return "Digital Identity";
+}
+
+type SuggestedAccount = { apolloId: string; name: string; title: string; company: string; linkedinUrl?: string | null; linkedinSearchUrl: string };
+
+function SuggestedAccountsModal({ category, country, publicationId, onChangeCategory, onClose }: {
+  category: string;
+  country: CountryKey;
+  publicationId: string;
+  onChangeCategory: (c: string) => void;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [accounts, setAccounts] = useState<SuggestedAccount[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError("");
+    fetch("/api/suggest-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category, country, publicationId, limit: 10 }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (!alive) return;
+        if (Array.isArray(d.suggestions)) setAccounts(d.suggestions);
+        else setError(d.error || "No se encontraron perfiles.");
+      })
+      .catch(() => { if (alive) setError("No se pudo consultar Apollo."); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [category, country, publicationId]);
+
+  const flag = CMAP[country]?.flag ?? "🌎";
+  const countryLabel = CMAP[country]?.label ?? country;
+
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{
+      position:"fixed", inset:0, zIndex:700,
+      background:"rgba(0,0,0,0.55)", backdropFilter:"blur(3px)",
+      display:"flex", alignItems:"center", justifyContent:"center", padding:24,
+    }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        width:"100%", maxWidth:560, maxHeight:"86vh", display:"flex", flexDirection:"column",
+        borderRadius:16, overflow:"hidden",
+        background:"var(--cal-window-bg)", border:"1px solid var(--cal-border)",
+        boxShadow:"var(--shadow-window)",
+      }}>
+        {/* header */}
+        <div style={{
+          padding:"18px 22px", borderBottom:"1px solid var(--cal-border)",
+          background:"var(--cal-header-bg)", flexShrink:0,
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:15, fontWeight:800, color:"var(--text-primary)", flex:1, letterSpacing:"-0.01em" }}>
+              Perfiles para seguir <span style={{ fontSize:20, marginLeft:2 }}>{flag}</span>
+            </span>
+            <button type="button" onClick={onClose} aria-label="Cerrar" style={{
+              width:30, height:30, borderRadius:8, border:"1px solid var(--cal-border)",
+              background:"var(--cal-cell-bg)", color:"var(--text-secondary)", cursor:"pointer",
+              fontSize:16, lineHeight:1, display:"flex", alignItems:"center", justifyContent:"center",
+            }}>×</button>
+          </div>
+          <p style={{ margin:"6px 0 12px", fontSize:12.5, color:"var(--text-secondary)", fontWeight:500 }}>
+            ICP según el tema del post · País: <strong>{countryLabel}</strong> · vía Apollo (sin créditos)
+          </p>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <label htmlFor="sg-cat" style={{ fontSize:12, fontWeight:700, color:"var(--text-primary)" }}>Tema</label>
+            <select id="sg-cat" value={category} onChange={e=>onChangeCategory(e.target.value)} style={{
+              flex:1, padding:"9px 12px", borderRadius:9, cursor:"pointer",
+              border:"1px solid var(--cal-border)", background:"var(--cal-urlbar-bg)",
+              color:"var(--text-primary)", fontSize:13, fontWeight:600, fontFamily:"var(--font-sans)", outline:"none",
+            }}>
+              {PRODUCT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* body */}
+        <div style={{ overflowY:"auto", padding:"8px 0" }}>
+          {loading && (
+            <div style={{ padding:"40px 22px", textAlign:"center", color:"var(--text-secondary)", fontSize:13, fontWeight:500 }}>
+              Buscando perfiles en Apollo…
+            </div>
+          )}
+          {!loading && error && (
+            <div style={{ padding:"30px 22px", textAlign:"center", color:"var(--status-error)", fontSize:13, fontWeight:600 }}>
+              {error}
+            </div>
+          )}
+          {!loading && !error && accounts.length === 0 && (
+            <div style={{ padding:"30px 22px", textAlign:"center", color:"var(--text-secondary)", fontSize:13 }}>
+              No se encontraron perfiles para este tema y país.
+            </div>
+          )}
+          {!loading && !error && accounts.length > 0 && (
+            <p style={{ margin:"0 22px 10px", fontSize:11.5, color:"var(--text-muted)", fontWeight:500, lineHeight:1.45 }}>
+              💡 El botón abre el <strong>perfil de LinkedIn</strong> de la persona (o la búsqueda con su nombre si aún no está resuelto).
+            </p>
+          )}
+          {!loading && !error && accounts.map((a, i) => (
+            <div key={a.apolloId || i} style={{
+              display:"flex", alignItems:"center", gap:12, padding:"11px 22px",
+              borderBottom:"1px solid var(--cal-border)",
+            }}>
+              <div style={{
+                width:34, height:34, flexShrink:0, borderRadius:"50%",
+                background:"var(--btn-bg)", border:"1px solid var(--cal-border)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:13, fontWeight:700, color:"var(--text-secondary)",
+              }}>{(a.name || "?").slice(0,1).toUpperCase()}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:700, color:"var(--text-primary)" }}>{a.name}</div>
+                <div style={{ fontSize:12, color:"var(--text-secondary)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {a.title} · {a.company}
+                </div>
+              </div>
+              <a href={a.linkedinUrl || a.linkedinSearchUrl} target="_blank" rel="noopener noreferrer"
+                title={a.linkedinUrl ? `Abrir el perfil de ${a.name}` : `Buscar a ${a.name} en LinkedIn`} style={{
+                flexShrink:0, height:34, padding:"0 14px", borderRadius:9,
+                border:"1px solid var(--linkedin-line)", background:"var(--linkedin-bg)", color:"var(--linkedin)",
+                fontSize:12.5, fontWeight:700, fontFamily:"var(--font-sans)", textDecoration:"none",
+                display:"flex", alignItems:"center", gap:6,
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                LinkedIn
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
 function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Publication[]; initialPubId?: string }) {
@@ -1628,6 +1891,8 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
   const [generated,setGenerated]= useState("");
   const [isGen,    setIsGen]    = useState(false);
   const [copied,   setCopied]   = useState(false);
+  const [showSuggest,     setShowSuggest]     = useState(false);
+  const [suggestCategory, setSuggestCategory] = useState<string>("Digital Identity");
   const [showTone,    setShowTone]    = useState(false);
   const [showSave,    setShowSave]    = useState(false);
   const [saveStatus,  setSaveStatus]  = useState<"idle"|"saving"|"saved"|"error">("idle");
@@ -1714,6 +1979,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
       setGenMode("local");
     } finally {
       setIsGen(false);
+      // Al generar el post → sugerir perfiles ICP (producto de la tarjeta del calendario;
+      // si la tarjeta es vieja y no lo tiene, se infiere del contenido)
+      const pub = pubs.find(p => p.id === selectedPubId);
+      setSuggestCategory(pub?.category ?? inferProduct(topic));
+      setShowSuggest(true);
     }
   }
 
@@ -1811,6 +2081,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Relacionar con el calendario
               </span>
+              <HelpHint
+                label="¿Para qué vincular al calendario?"
+                title="Vincular al calendario"
+                text="Conecta este post con una tarjeta ya programada. Así el país y el enfoque del mensaje se autocompletan según lo que planificaste, y el post queda asociado a esa fecha."
+              />
               <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-muted)", fontWeight:500 }}>opcional</span>
             </div>
             <select
@@ -1865,6 +2140,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Describe el tema
               </span>
+              <HelpHint
+                label="¿Qué escribo en el tema?"
+                title="Tema del post"
+                text="Resume en una frase de qué trata la publicación. Es la base que la IA usa para redactar el borrador, así que entre más claro el tema, mejor el resultado."
+              />
             </div>
             <textarea
               rows={3}
@@ -1895,6 +2175,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Ajusta el estilo
               </span>
+              <HelpHint
+                label="¿Qué controla el estilo?"
+                title="Estilo del contenido"
+                text="Define idioma, extensión, tono y enfoque del mensaje. La IA adapta el borrador a estas opciones. Si eliges un autor con tono personal, el tono lo define su perfil."
+              />
             </div>
 
             {/* row: idioma + extensión */}
@@ -1957,6 +2242,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Autor y tono personal
               </span>
+              <HelpHint
+                label="¿Qué es el tono personal?"
+                title="Tono personal del autor"
+                text="Elige quién firma el post y se redactará imitando su estilo real de LinkedIn (emojis, hashtags, longitud, forma de escribir). Usa “Adaptar tono” para crear el perfil pegando sus publicaciones."
+              />
               <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-secondary)", fontWeight:500 }}>opcional</span>
             </div>
             <p style={{ fontSize:13, color:"var(--text-secondary)", margin:"-6px 0 14px", lineHeight:1.5 }}>
@@ -2209,8 +2499,30 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               {generated.length > 2800 && (
                 <span style={{ fontSize:12, color:"var(--status-error)", fontWeight:600 }}>Cerca del límite</span>
               )}
+              {generated && (
+                <button type="button" onClick={()=>setShowSuggest(true)} style={{
+                  height:30, padding:"0 12px", borderRadius:8,
+                  border:"1px solid var(--cal-border)", background:"var(--cal-cell-bg)",
+                  color:"var(--text-secondary)", fontSize:12, fontWeight:600,
+                  fontFamily:"var(--font-sans)", cursor:"pointer", display:"flex", alignItems:"center", gap:6,
+                }}>
+                  👥 Perfiles para seguir
+                </button>
+              )}
+              {generated && (
+                <HelpHint
+                  label="¿Qué son los perfiles para seguir?"
+                  title="Perfiles ICP · vía Apollo"
+                  text="Sugiere cuentas y personas de tu cliente ideal (ICP) para interactuar, según el producto y el país del post. Consulta Apollo sin gastar créditos."
+                />
+              )}
             </div>
-            <div style={{ display:"flex", gap:8 }}>
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <HelpHint
+                label="¿Guardar o publicar?"
+                title="Guardar y publicar"
+                text="Guardar post lo archiva como borrador (queda en el historial del autor). Publicar en LinkedIn copia el texto y abre LinkedIn listo para pegar y publicar."
+              />
               <button type="button" onClick={()=>setShowSave(true)} disabled={!generated}
                 className="ripple-effect hover-lift"
                 style={{
@@ -2275,6 +2587,17 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
           savedFile={savedFile}
           onSave={handleSavePost}
           onClose={()=>{ if(saveStatus==="saving") return; setShowSave(false); setSaveStatus("idle"); }}
+        />
+      )}
+
+      {/* ── Suggested accounts (ICP) modal ── */}
+      {showSuggest && (
+        <SuggestedAccountsModal
+          category={suggestCategory}
+          country={pubs.find(p => p.id === selectedPubId)?.country ?? "LATAM"}
+          publicationId={selectedPubId || "create-adhoc"}
+          onChangeCategory={setSuggestCategory}
+          onClose={()=>setShowSuggest(false)}
         />
       )}
     </>
@@ -2387,6 +2710,8 @@ export default function CalendarPage() {
   const [pubs,   setPubs]   = useState<Publication[]>(SEED);
   const [modal,  setModal]  = useState<ModalState>({ mode:"closed" });
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // Tarjeta recién creada → dispara la búsqueda de ICPs en Apollo (categoría + país del card)
+  const [suggestFor, setSuggestFor] = useState<{ category: string; country: CountryKey; publicationId: string } | null>(null);
 
   const dismissToast = useCallback((id: number) => setToasts(ts => ts.filter(t => t.id !== id)), []);
   const notify = useCallback((kind: ToastItem["kind"], msg: string, retry?: () => void) => {
@@ -2400,6 +2725,15 @@ export default function CalendarPage() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  // Sigue la configuración de tema del sistema: aplica el valor al montar y reacciona si el usuario lo cambia en su SO
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setDark(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setDark(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -2429,10 +2763,13 @@ export default function CalendarPage() {
   function nextMonth() { if (month === 11) { setMonth(0); setYear(y=>y+1); } else setMonth(m=>m+1); }
 
   function savePub(p: Publication) {
+    const isNew = !pubs.some(x => x.id === p.id);
     setPubs(prev => {
       const i = prev.findIndex(x => x.id === p.id);
       return i >= 0 ? prev.map((x, idx) => idx === i ? p : x) : [...prev, p];
     });
+    // Crear una tarjeta dispara la búsqueda en Apollo con su producto y país
+    if (isNew) setSuggestFor({ category: p.category ?? "Digital Identity", country: p.country, publicationId: p.id });
     fetch("/api/publications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2506,6 +2843,11 @@ export default function CalendarPage() {
                 </button>
               ))}
             </div>
+            <HelpHint
+              label="¿Qué hace cada pestaña?"
+              title="Las dos vistas"
+              text="Calendario: planifica y visualiza tus publicaciones por país y fecha. Crea tu post: redacta el contenido con ayuda de IA y el tono de cada autor."
+            />
           </div>
 
           {/* Right controls */}
@@ -2516,7 +2858,17 @@ export default function CalendarPage() {
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                   Nuevo post
                 </GlassBtn>
+                <HelpHint
+                  label="¿Qué es Nuevo post?"
+                  title="Nuevo post"
+                  text="Abre una tarjeta para programar una publicación: título, contenido, país, producto, fechas y las personas que la firman. También puedes hacer clic en cualquier día del calendario."
+                />
                 <CountryDropdown selected={filter} onChange={setFilter} />
+                <HelpHint
+                  label="¿Qué hace el filtro de país?"
+                  title="Filtro por mercado"
+                  text="Muestra solo las publicaciones de un país. Elige LATAM para ver todos los mercados a la vez. El país siempre se acompaña de su bandera y nombre."
+                />
               </>
             )}
             <GlassBtn onClick={() => setDark(!dark)} small aria-label={dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
@@ -2581,6 +2933,11 @@ export default function CalendarPage() {
                 </button>
               ))}
             </div>
+            <HelpHint
+              label="¿Cómo navego el calendario?"
+              title="Navegación"
+              text="Cambia de mes con las flechas o con las teclas ← →. Haz clic en cualquier día para programar una publicación en esa fecha; pulsa N para crear una nueva."
+            />
           </div>
         </div>
 
@@ -2767,6 +3124,17 @@ export default function CalendarPage() {
           onClose={() => setModal({ mode:"closed" })}
           onEdit={pub => setModal({ mode:"edit", pub })}
           onGoToCreate={pubId => { setModal({ mode:"closed" }); setCreatePubId(pubId); setActiveTab("create"); }}
+        />
+      )}
+
+      {/* Tarjeta recién creada → búsqueda de ICPs en Apollo según producto + país del card */}
+      {suggestFor && (
+        <SuggestedAccountsModal
+          category={suggestFor.category}
+          country={suggestFor.country}
+          publicationId={suggestFor.publicationId}
+          onChangeCategory={c => setSuggestFor(s => s ? { ...s, category: c } : s)}
+          onClose={() => setSuggestFor(null)}
         />
       )}
 
