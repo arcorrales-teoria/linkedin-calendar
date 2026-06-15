@@ -22,6 +22,7 @@ export async function GET() {
       startDate: row.start_date,
       endDate: row.end_date,
       country: row.country,
+      category: row.category ?? undefined,
       people: row.people ?? [],
     }));
 
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       start_date: pub.startDate,
       end_date: pub.endDate,
       country: pub.country,
+      category: pub.category ?? null,
       people: pub.people ?? [],
     };
 

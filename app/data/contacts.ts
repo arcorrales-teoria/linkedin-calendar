@@ -1,0 +1,68 @@
+// ── Directorio de contactos del equipo (para los recordatorios de n8n) ──────────
+//
+// El calendario guarda a las personas solo por NOMBRE (array `people` de cada tarjeta).
+// Para que n8n pueda enviarle el recordatorio a cada quien, aquí mapeamos ese nombre
+// a su canal de contacto. Hoy usamos Telegram (es lo que ya tiene el workflow).
+//
+// CÓMO LLENAR EL chatId DE TELEGRAM:
+//   1. La persona le escribe /start a tu bot de Telegram (el mismo que usas en n8n).
+//   2. Abre en el navegador:
+//        https://api.telegram.org/bot<TU_BOT_TOKEN>/getUpdates
+//      y copia el número de "chat":{"id": ...} que aparece para esa persona.
+//   3. Pégalo abajo en `telegram`.
+//
+// Mientras `telegram` esté vacío, el endpoint /api/reminders marca a esa persona como
+// `channelReady: false` y n8n la salta (no intenta enviar a un chat inexistente).
+//
+// El `name` debe coincidir con el nombre que se usa en las tarjetas del calendario
+// (array PEOPLE en app/page.tsx). El matcheo es tolerante a tildes/mayúsculas.
+
+export interface Contact {
+  /** Nombre tal cual aparece en las tarjetas del calendario */
+  name: string;
+  /** chat_id numérico de Telegram (como string). Vacío = aún sin configurar */
+  telegram?: string;
+  /** correo corporativo, por si más adelante se agrega canal email */
+  email?: string;
+}
+
+export const CONTACTS: Contact[] = [
+  { name: "Ericka Ortegon",     telegram: "", email: "" },
+  { name: "Maria Juliana",      telegram: "", email: "" },
+  { name: "Mafe Ramirez",       telegram: "", email: "" },
+  { name: "Mariangel",          telegram: "", email: "" },
+  { name: "Gabriela Cala",      telegram: "", email: "" },
+  { name: "Alessandra Huapaya", telegram: "", email: "" },
+  { name: "Cesar Lengua",       telegram: "", email: "" },
+  { name: "Manuela Peña",       telegram: "", email: "" },
+  { name: "Daniel Bilbao",      telegram: "", email: "" },
+  { name: "Daniel Villegas",    telegram: "", email: "" },
+  { name: "Lony Milena",        telegram: "", email: "" },
+  { name: "Christian Rojas",    telegram: "", email: "" },
+];
+
+/** Normaliza un nombre para comparar sin tildes ni mayúsculas. */
+function normName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+}
+
+/** Busca el contacto de una persona por nombre (tolerante a tildes/orden/subconjunto). */
+export function findContact(personName: string): Contact | null {
+  const target = normName(personName).split(/\s+/).filter((w) => w.length > 1);
+  if (target.length === 0) return null;
+
+  for (const c of CONTACTS) {
+    const parts = normName(c.name).split(/\s+/).filter((w) => w.length > 1);
+    if (parts.length === 0) continue;
+    // coincide si uno es subconjunto del otro (ej. "Maria Juliana" ⊆ "Maria Juliana Hernandez")
+    if (target.every((w) => parts.includes(w)) || parts.every((w) => target.includes(w))) {
+      return c;
+    }
+  }
+  return null;
+}

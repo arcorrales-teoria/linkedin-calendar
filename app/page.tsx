@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, createContext, useContext } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ const PRODUCT_CATEGORIES = [
 ] as const;
 type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
-interface Publication {
+export interface Publication {
   id: string;
   startDate: string;
   endDate: string;
@@ -368,15 +368,24 @@ function PersonBadge({ name, size = 24 }: { name: string; size?: number }) {
 
 // ── IconTile — rounded-square tile with a thin-stroke icon ───────────────────
 
-function IconTile({ children, size = 38 }: { children: React.ReactNode; size?: number }) {
+// Cuando un contenedor (HelpCard) está activo, ilumina los IconTile que lleva dentro.
+const IconTileActive = createContext(false);
+
+function IconTile({ children, size = 38, active: activeProp }: { children: React.ReactNode; size?: number; active?: boolean }) {
+  const ctx = useContext(IconTileActive);
+  const active = activeProp ?? ctx;
   return (
     <span aria-hidden="true" style={{
-      width:size, height:size, borderRadius:10, flexShrink:0,
-      background:"var(--btn-bg)",
-      border:"1px solid var(--cal-border)",
+      width:size, height:size, borderRadius:12, flexShrink:0,
+      background: active
+        ? "linear-gradient(165deg, rgba(var(--accent-rgb),0.30) 0%, rgba(var(--accent-rgb),0.12) 100%)"
+        : "var(--icon-tile-bg)",
+      border:`1px solid ${active ? "rgba(var(--accent-rgb),0.55)" : "var(--icon-tile-border)"}`,
       display:"inline-flex", alignItems:"center", justifyContent:"center",
-      color:"var(--text-secondary)",
-      boxShadow:"var(--shadow-btn)",
+      color: active ? "var(--accent)" : "var(--text-secondary)",
+      boxShadow: active ? "var(--icon-tile-glow)" : "var(--icon-tile-shadow)",
+      transform: active ? "translateY(-1px)" : "none",
+      transition:"background 240ms var(--ease-premium), border-color 240ms var(--ease-premium), box-shadow 240ms var(--ease-premium), color 240ms var(--ease-premium), transform 240ms var(--ease-premium)",
     }}>
       {children}
     </span>
@@ -428,7 +437,9 @@ function HelpCard({
         ...style,
       }}
     >
-      <div style={contentStyle}>{children}</div>
+      <IconTileActive.Provider value={active}>
+        <div style={contentStyle}>{children}</div>
+      </IconTileActive.Provider>
 
       <div aria-hidden={!active} role="note" style={{
         overflow:"hidden",
@@ -2035,8 +2046,9 @@ function SuggestedAccountsModal({ category, country, publicationId, onChangeCate
 
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
-function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Publication[]; initialPubId?: string }) {
+export function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Publication[]; initialPubId?: string }) {
   const [selectedPubId, setSelectedPubId] = useState(initialPubId ?? "");
+  const [country,  setCountry]  = useState<CountryKey>("LATAM");
   const [topic,    setTopic]    = useState("");
   const [language, setLanguage] = useState("Español");
   const [tone,     setTone]     = useState("Profesional");
@@ -2105,7 +2117,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
     if (!selectedPubId) return;
     const pub = pubs.find(p => p.id === selectedPubId);
     if (!pub) return;
-    const c = CMAP[pub.country];
+    setCountry(pub.country);
     setTopic(pub.content ? pub.content : pub.title);
     const auto = autoConfigFromPub(pub);
     setFocus(auto.focus);
@@ -2314,6 +2326,24 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
               <span style={{ fontSize:15, fontWeight:700, color:"var(--text-primary)", letterSpacing:"-0.02em" }}>
                 Ajusta el estilo
               </span>
+            </div>
+
+            {/* país (mercado / ICP) */}
+            <div>
+              <label style={{ ...labelSt, display:"flex", alignItems:"center", gap:6 }}>
+                País del mercado
+                {selectedPub
+                  ? <span style={{ fontSize:10, fontWeight:600, color:"#059669", background:"rgba(5,150,105,0.10)", padding:"1px 7px", borderRadius:20, letterSpacing:"0.04em" }}>auto del calendario</span>
+                  : <span style={{ fontSize:10, fontWeight:600, color:"var(--accent)", background:"rgba(var(--accent-rgb),0.12)", padding:"1px 7px", borderRadius:20, letterSpacing:"0.04em" }}>define los contactos ICP</span>}
+              </label>
+              <select
+                style={{ ...inputSt, cursor: selectedPub ? "not-allowed" : "pointer", opacity: selectedPub ? 0.7 : 1 }}
+                value={country}
+                disabled={!!selectedPub}
+                onChange={e=>setCountry(e.target.value as CountryKey)}
+                onFocus={onFocusFn} onBlur={onBlurFn}>
+                {COUNTRIES.map(c=><option key={c.key} value={c.key}>{c.flag}  {c.label}</option>)}
+              </select>
             </div>
 
             {/* row: idioma + extensión */}
@@ -2549,11 +2579,11 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
                 padding:32,
               }}>
                 <div style={{
-                  width:64, height:64, borderRadius:16,
-                  background:"var(--btn-bg)",
-                  border:"1px solid var(--cal-border)",
+                  width:64, height:64, borderRadius:18,
+                  background:"var(--icon-tile-bg)",
+                  border:"1px solid var(--icon-tile-border)",
                   display:"flex", alignItems:"center", justifyContent:"center",
-                  boxShadow:"var(--shadow-btn)",
+                  boxShadow:"var(--icon-tile-shadow)",
                 }}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" stroke="var(--text-secondary)" strokeWidth="1.5" fill="none"/>
@@ -2720,8 +2750,8 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
       {showSuggest && (
         <SuggestedAccountsModal
           category={suggestCategory}
-          country={pubs.find(p => p.id === selectedPubId)?.country ?? "LATAM"}
-          publicationId={selectedPubId || "create-adhoc"}
+          country={country}
+          publicationId={selectedPubId || `create-adhoc-${country}`}
           onChangeCategory={setSuggestCategory}
           onClose={()=>setShowSuggest(false)}
         />
@@ -2732,7 +2762,7 @@ function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Public
 
 // ── MacWindow ─────────────────────────────────────────────────────────────────
 
-function MacWindow({ children }: { children: React.ReactNode }) {
+export function MacWindow({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       flex:1, display:"flex", flexDirection:"column",
