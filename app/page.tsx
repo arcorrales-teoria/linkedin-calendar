@@ -18,8 +18,11 @@ interface Country {
 }
 
 // Productos de Truora; cada uno define el ICP que se busca en Apollo.
+// "About Truora" es para posts generales (no de un producto puntual); igual recomienda ICPs.
 const PRODUCT_CATEGORIES = [
-  "Digital Identity", "Background Checks", "WA Onboarding", "WA Banking", "WA Agentic",
+  "Digital Identity", "Background Checks", "Fraude", "Firma Digital",
+  "WA Onboarding", "Onboarding (General)", "WA Banking", "WA Agentic",
+  "About Truora",
 ] as const;
 type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
@@ -1900,6 +1903,8 @@ function SavePostModal({
 function inferProduct(text: string): ProductCategory {
   const t = (text || "").toLowerCase();
   if (/background|antecedent/.test(t)) return "Background Checks";
+  if (/fraude|fraud|anti.?fraud|estafa/.test(t)) return "Fraude";
+  if (/firma digital|firma electr|e-?sign|signature/.test(t)) return "Firma Digital";
   if (/agentic|agente|\bagent\b|chatbot|\bbot\b/.test(t)) return "WA Agentic";
   if (/banking|banca|wallet|billetera|cuenta/.test(t)) return "WA Banking";
   if (/onboarding|registro|alta de usuario/.test(t)) return "WA Onboarding";

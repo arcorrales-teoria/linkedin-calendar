@@ -122,6 +122,7 @@ export async function GET(request: Request) {
 
         reminders.push({
           person,
+          role: contact?.role || null,
           chatId,
           channelReady: Boolean(chatId),
           email: contact?.email || null,

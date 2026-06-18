@@ -22,23 +22,29 @@ export interface Contact {
   name: string;
   /** chat_id numérico de Telegram (como string). Vacío = aún sin configurar */
   telegram?: string;
+  /**
+   * Rol de la persona. Lo usa el AI Agent de n8n para ajustar la voz del mensaje.
+   * Ejemplos del Sheet: Champion · Sales Account Executive · Head of Demand Generation ·
+   * Head of Sales · BDR. Déjalo vacío si no aplica.
+   */
+  role?: string;
   /** correo corporativo, por si más adelante se agrega canal email */
   email?: string;
 }
 
 export const CONTACTS: Contact[] = [
-  { name: "Ericka Ortegon",     telegram: "", email: "" },
-  { name: "Maria Juliana",      telegram: "", email: "" },
-  { name: "Mafe Ramirez",       telegram: "", email: "" },
-  { name: "Mariangel",          telegram: "", email: "" },
-  { name: "Gabriela Cala",      telegram: "", email: "" },
-  { name: "Alessandra Huapaya", telegram: "", email: "" },
-  { name: "Cesar Lengua",       telegram: "", email: "" },
-  { name: "Manuela Peña",       telegram: "", email: "" },
-  { name: "Daniel Bilbao",      telegram: "", email: "" },
-  { name: "Daniel Villegas",    telegram: "", email: "" },
-  { name: "Lony Milena",        telegram: "", email: "" },
-  { name: "Christian Rojas",    telegram: "", email: "" },
+  { name: "Ericka Ortegon",     telegram: "", role: "", email: "" },
+  { name: "Maria Juliana",      telegram: "", role: "", email: "" },
+  { name: "Mafe Ramirez",       telegram: "", role: "", email: "" },
+  { name: "Mariangel",          telegram: "", role: "", email: "" },
+  { name: "Gabriela Cala",      telegram: "", role: "", email: "" },
+  { name: "Alessandra Huapaya", telegram: "", role: "", email: "" },
+  { name: "Cesar Lengua",       telegram: "", role: "", email: "" },
+  { name: "Manuela Peña",       telegram: "", role: "", email: "" },
+  { name: "Daniel Bilbao",      telegram: "", role: "", email: "" },
+  { name: "Daniel Villegas",    telegram: "", role: "", email: "" },
+  { name: "Lony Milena",        telegram: "", role: "", email: "" },
+  { name: "Christian Rojas",    telegram: "", role: "", email: "" },
 ];
 
 /** Normaliza un nombre para comparar sin tildes ni mayúsculas. */

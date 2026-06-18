@@ -43,13 +43,21 @@ const RISK_TITLES = [
   "Head of Digital Transformation",
 ];
 
+// ICP "mixto": combina cargos de growth y de risk (para temas transversales).
+const MIXED_TITLES = [...new Set([...GROWTH_TITLES, ...RISK_TITLES])];
+
 // --- Mapeo: producto (seleccionado en la tarjeta del calendario) → cargos ICP ---
 const PRODUCT_TO_TITLES: Record<string, string[]> = {
   "WA Onboarding": GROWTH_TITLES,
+  "Onboarding (General)": GROWTH_TITLES,
   "WA Banking": GROWTH_TITLES,
   "WA Agentic": GROWTH_TITLES,
-  "Digital Identity": [...new Set([...GROWTH_TITLES, ...RISK_TITLES])],
+  "Digital Identity": MIXED_TITLES,
+  "Firma Digital": MIXED_TITLES,
   "Background Checks": RISK_TITLES,
+  "Fraude": RISK_TITLES,
+  // Post general sobre Truora: igual recomienda ICPs, con audiencia mixta.
+  "About Truora": MIXED_TITLES,
 };
 
 // --- Mapeo: país del calendario → ubicaciones de Apollo ---
@@ -96,8 +104,8 @@ type ApolloPerson = {
 type ApolloMatch = { name?: string; linkedin_url?: string; headline?: string } | null;
 
 function icpGroupFor(category: string): "growth" | "risk" | "mixed" {
-  if (category === "Digital Identity") return "mixed";
   const titles = PRODUCT_TO_TITLES[category] ?? GROWTH_TITLES;
+  if (titles === MIXED_TITLES) return "mixed";
   return titles === RISK_TITLES ? "risk" : "growth";
 }
 

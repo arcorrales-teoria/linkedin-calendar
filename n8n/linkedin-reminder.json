@@ -5,15 +5,19 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "days", "triggerAtHour": 8 }
+            {
+              "field": "weeks",
+              "triggerAtDay": [1, 2, 4],
+              "triggerAtHour": 10
+            }
           ]
         }
       },
-      "id": "node-schedule",
-      "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [240, 320]
+      "typeVersion": 1.3,
+      "position": [-336, 528],
+      "id": "e0cb2284-9cb4-444f-a197-c02fee72a686",
+      "name": "Schedule Trigger"
     },
     {
       "parameters": {
@@ -32,22 +36,22 @@
         },
         "options": {}
       },
-      "id": "node-http",
-      "name": "Get reminders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 320]
+      "position": [-96, 528],
+      "id": "0ba46e29-351e-4c06-9109-4fd2609e41f0",
+      "name": "Get reminders"
     },
     {
       "parameters": {
         "fieldToSplitOut": "reminders",
         "options": {}
       },
-      "id": "node-split",
-      "name": "Split Reminders",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [720, 320]
+      "position": [112, 528],
+      "id": "b4af3a51-2029-4eb3-bb52-6858413b16ca",
+      "name": "Split Reminders"
     },
     {
       "parameters": {
@@ -65,25 +69,69 @@
         },
         "options": {}
       },
-      "id": "node-filter",
-      "name": "Tiene Telegram?",
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2,
-      "position": [960, 320]
+      "position": [256, 528],
+      "id": "db8dcdd3-4927-4820-89a1-f2fc2ea9c159",
+      "name": "Tiene Telegram?"
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "={{ $json.defaultMessage }}",
+        "promptType": "define",
+        "text": "=Genera un mensaje de Telegram para {{ $json.person }}, quien es {{ $json.role || 'miembro del equipo' }} en {{ $json.country.label }}.\n\nHOY tiene programada esta publicación en el calendario de LinkedIn:\n- Tema / Producto: {{ $json.category }}\n- Título: {{ $json.publication.title }}\n- Idea base: {{ $json.publication.content }}\n- Tono de la persona: {{ $json.tone.style || 'profesional' }}\n\nEres el estratega de contenido de Truora, empresa líder en identidad digital, prevención de fraude y automatización por WhatsApp para Latinoamérica. Sus clientes son bancos, fintechs, e-commerce y marketplaces.\n\nTu tarea es escribir un mensaje de Telegram que motive a {{ $json.person }} a publicar HOY en LinkedIn ese tema programado, dirigido a C-levels y directivos de empresas en Latam.\n\nTono de marca: inspirador, aspiracional, directo.\n\nQué tema usar:\n- Si hay un Tema/Producto programado arriba (distinto de \"—\" o vacío), ESE es el tema del mensaje; aterrízalo al contexto de {{ $json.country.label }}.\n- Si el Tema viene vacío o \"—\", elige según el día de la semana: Lunes = Regulación del país (Open Finance, KYC, AML, identidad digital); Martes = Producto (Digital Identity, Background Checks, onboarding digital); Jueves = lo más conversado HOY entre casos de éxito, novedades, tendencias de mercado, regulación o producto (búscalo en internet).\n\nReglas según rol:\n- Champion, Sales Account Executive, Head of Demand Generation, Head of Sales: voz de liderazgo regional, tendencias e impacto en su país o región.\n- BDR: voz consultiva y comercial, resultados concretos y conversaciones de negocio.\n\nReglas del mensaje de Telegram:\n- Máximo 6 líneas\n- Línea 1: saludo con nombre\n- Línea 2: el tema de hoy y por qué es relevante (si aplica, noticias del día)\n- Línea 3: ángulo específico según su rol y país\n- Línea 4: recordatorio de que el generador crea el BORRADOR y que deben publicar ellos manualmente en LinkedIn\n- Línea 5: link al generador\n- Sin asteriscos ni markdown ni guiones\n- Cuando menciones regulación de algún país, incluye el nombre o nomenclatura\n- Emojis solo al inicio de cada línea, con moderación",
+        "options": {
+          "systemMessage": "=La fecha de hoy es {{ $now.setLocale('es').toFormat('cccc d MMMM yyyy') }}.\n\nEscribe el mensaje de Telegram para {{ $json.person }}, {{ $json.role || 'miembro del equipo' }} de Truora en {{ $json.country.label }}.\n\nSi necesitas tema por día (porque la tarjeta no trae uno), busca qué está pasando HOY en identidad digital, prevención de fraude o automatización en Latinoamérica y elige lo más relevante para este día de la semana.\n\nLink al generador de copy para el post:\nhttps://post-linkedin-truinfluencers1.lovable.app\n\nRecuerda: el link es para generar el copy del post, no para publicar. Deben publicar manualmente en LinkedIn.\nCuando menciones regulación de algún país, incluye el nombre o nomenclatura.\nSolo operas en México, Colombia, Perú, Argentina y Chile."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [480, 512],
+      "id": "e0c11c54-5439-43fe-8e7f-2e475f8dd541",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [480, 688],
+      "id": "7b6fd2f9-b310-451b-9a2d-edf73e239b83",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "TNJcoZmHHqcooMnZ",
+          "name": "OpenAi account 301"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Split Reminders').item.json.chatId }}",
+        "text": "={{ $json.output }}",
         "additionalFields": {}
       },
-      "id": "node-telegram",
-      "name": "Send a text message",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1200, 320]
+      "position": [848, 512],
+      "id": "4f87b66e-ae22-4fcc-a879-cbaea80871f1",
+      "name": "Send a text message",
+      "webhookId": "bb3aa94a-73c6-47e9-b06a-b6a95c3c1cd9",
+      "credentials": {
+        "telegramApi": {
+          "id": "kmDrMp852jzTZpx4",
+          "name": "Telegram account 335"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Schedule Trigger": {
       "main": [[{ "node": "Get reminders", "type": "main", "index": 0 }]]
@@ -95,9 +143,22 @@
       "main": [[{ "node": "Tiene Telegram?", "type": "main", "index": 0 }]]
     },
     "Tiene Telegram?": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "AI Agent": {
       "main": [[{ "node": "Send a text message", "type": "main", "index": 0 }]]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": {}
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bfcd79ea29d60ad7d874e0adeab29eff01fdb1aad9bafede739cf53b551b46ab"
+  },
+  "tags": []
 }
