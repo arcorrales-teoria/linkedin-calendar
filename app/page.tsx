@@ -711,7 +711,12 @@ function CountryDropdown({ selected, onChange }: { selected: CountryKey; onChang
 
 // ── PeopleInput ───────────────────────────────────────────────────────────────
 
-function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: string[]) => void }) {
+function PeopleInput({ people, onChange, knownPeople = PEOPLE, onAddNew }: {
+  people: string[];
+  onChange: (p: string[]) => void;
+  knownPeople?: string[];
+  onAddNew?: (name: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [open,  setOpen]  = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -719,14 +724,18 @@ function PeopleInput({ people, onChange }: { people: string[]; onChange: (p: str
 
   useClickOutside(containerRef, useCallback(() => setOpen(false), []));
 
-  const filtered = PEOPLE.filter(p => p.toLowerCase().includes(query.toLowerCase()));
+  const filtered = knownPeople.filter(p => p.toLowerCase().includes(query.toLowerCase()));
 
   function toggle(name: string) {
     onChange(people.includes(name) ? people.filter(x => x !== name) : [...people, name]);
   }
   function addCustom() {
     const n = query.trim();
-    if (n && !people.includes(n)) { onChange([...people, n]); setQuery(""); }
+    if (n && !people.includes(n)) {
+      onChange([...people, n]);
+      setQuery("");
+      if (!knownPeople.includes(n)) onAddNew?.(n);
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -1055,7 +1064,7 @@ function DateRangePicker({
 
 // ── PublicationModal ──────────────────────────────────────────────────────────
 
-function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGoToCreate }: {
+function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGoToCreate, knownPeople = PEOPLE, onAddPerson }: {
   state: Exclude<ModalState, { mode: "closed" }>;
   dark: boolean;
   onSave: (p: Publication) => void;
@@ -1063,6 +1072,8 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
   onClose: () => void;
   onEdit: (pub: Publication) => void;
   onGoToCreate: (pubId: string) => void;
+  knownPeople?: string[];
+  onAddPerson?: (name: string) => void;
 }) {
   const isCreate = state.mode === "create";
   const isView   = state.mode === "view";
@@ -1288,7 +1299,7 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
                   hint="Quiénes firman o aparecen en la publicación. Se muestran como avatares en la tarjeta del calendario. Puedes elegir de la lista o añadir a alguien nuevo.">
                   Personas
                 </HintLabel>
-                <PeopleInput people={people} onChange={setPeople} />
+                <PeopleInput people={people} onChange={setPeople} knownPeople={knownPeople} onAddNew={onAddPerson} />
               </div>
 
               <div>
@@ -2051,7 +2062,7 @@ function SuggestedAccountsModal({ category, country, publicationId, onChangeCate
 
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
-export function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs: Publication[]; initialPubId?: string }) {
+export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { dark: boolean; pubs: Publication[]; initialPubId?: string; extraPeople?: string[] }) {
   const [selectedPubId, setSelectedPubId] = useState(initialPubId ?? "");
   const [country,  setCountry]  = useState<CountryKey>("LATAM");
   const [topic,    setTopic]    = useState("");
@@ -2109,13 +2120,13 @@ export function PostCreator({ dark, pubs, initialPubId }: { dark: boolean; pubs:
 
   const fileProfile = person ? fileProfileMap[person] ?? null : null;
 
-  // PEOPLE + anyone with a tone profile that isn't in the hardcoded list
+  // PEOPLE + custom people + anyone with a tone profile that isn't already listed
   const allPeople = useMemo(() => {
-    const extra = profilePeople
+    const fromProfiles = profilePeople
       .filter(({ name, fileName }) => !PEOPLE.some(p => samePerson(p, name) || fileMatchesPerson(fileName, p)))
       .map(p => p.name);
-    return [...PEOPLE, ...extra];
-  }, [profilePeople]);
+    return [...new Set([...PEOPLE, ...extraPeople, ...fromProfiles])];
+  }, [profilePeople, extraPeople]);
 
   // When a calendar pub is selected → auto-fill topic + configure post type
   useEffect(() => {
@@ -2822,7 +2833,7 @@ let toastSeq = 0;
 function Toasts({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   return (
     <div aria-live="polite" style={{
-      position:"fixed", right:20, bottom:20, zIndex:600,
+      position:"fixed", right:20, bottom:20, zIndex:1000,
       display:"flex", flexDirection:"column", gap:8, pointerEvents:"none",
     }}>
       {toasts.map(t => (
@@ -2871,6 +2882,9 @@ export default function CalendarPage() {
   const [pubs,   setPubs]   = useState<Publication[]>(SEED);
   const [modal,  setModal]  = useState<ModalState>({ mode:"closed" });
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [customPeople, setCustomPeople] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("custom_people") ?? "[]"); } catch { return []; }
+  });
   // Tarjeta recién creada → dispara la búsqueda de ICPs en Apollo (categoría + país del card)
   const [suggestFor, setSuggestFor] = useState<{ category: string; country: CountryKey; publicationId: string } | null>(null);
 
@@ -2880,6 +2894,20 @@ export default function CalendarPage() {
     setToasts(ts => [...ts, { id, kind, msg, retry }]);
     if (kind === "success") setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 4000);
   }, []);
+
+  const addPerson = useCallback((name: string) => {
+    setCustomPeople(prev => {
+      if (prev.includes(name)) return prev;
+      const next = [...prev, name];
+      try { localStorage.setItem("custom_people", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const allKnownPeople = useMemo(
+    () => [...new Set([...PEOPLE, ...customPeople])],
+    [customPeople]
+  );
 
   const todayStr = toDateStr(TODAY);
 
@@ -2929,7 +2957,6 @@ export default function CalendarPage() {
       const i = prev.findIndex(x => x.id === p.id);
       return i >= 0 ? prev.map((x, idx) => idx === i ? p : x) : [...prev, p];
     });
-    // Crear una tarjeta dispara la búsqueda en Apollo con su producto y país
     if (isNew) setSuggestFor({ category: p.category ?? "Digital Identity", country: p.country, publicationId: p.id });
     fetch("/api/publications", {
       method: "POST",
@@ -3041,7 +3068,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} initialPubId={createPubId} key={createPubId} />}
+        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} initialPubId={createPubId} key={createPubId} extraPeople={customPeople} />}
 
         {activeTab === "calendar" && <>
         {/* ── Month header ── */}
@@ -3286,6 +3313,8 @@ export default function CalendarPage() {
           onClose={() => setModal({ mode:"closed" })}
           onEdit={pub => setModal({ mode:"edit", pub })}
           onGoToCreate={pubId => { setModal({ mode:"closed" }); setCreatePubId(pubId); setActiveTab("create"); }}
+          knownPeople={allKnownPeople}
+          onAddPerson={addPerson}
         />
       )}
 

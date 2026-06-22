@@ -27,7 +27,8 @@ export async function GET() {
     }));
 
     return NextResponse.json(pubs);
-  } catch {
+  } catch (err) {
+    console.error("publications GET error:", err);
     return NextResponse.json([]);
   }
 }
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("publications POST error:", err);
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }
@@ -64,7 +66,8 @@ export async function DELETE(request: Request) {
     const { error } = await supabase.from("publications").delete().eq("id", id);
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error("publications DELETE error:", err);
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

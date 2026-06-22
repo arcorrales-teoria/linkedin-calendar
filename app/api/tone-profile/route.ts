@@ -61,23 +61,60 @@ export async function GET(request: Request) {
           }
         })
         .filter((p) => p.name);
+
+      // Personas guardadas en Supabase (fuente durable: en producción el FS es de solo
+      // lectura, así que los .md no existen — la nube es lo único que persiste).
+      try {
+        const { data } = await supabase
+          .from("tone_profiles")
+          .select("person_name");
+        for (const row of data ?? []) {
+          const name = (row.person_name ?? "").trim();
+          if (name && !people.some((p) => normalize(p.name) === normalize(name))) {
+            people.push({ fileName: "", name });
+          }
+        }
+      } catch (e) {
+        console.error("tone-profile GET (supabase list) error:", e);
+      }
+
       return NextResponse.json({ ok: true, files, people });
     }
 
     const filePath = findProfileFile(person);
-    if (!filePath) {
-      return NextResponse.json({ ok: true, found: false });
+    if (filePath) {
+      const md = fs.readFileSync(filePath, "utf8");
+      const styleMatch = md.match(/\*\*Estilo detectado\*\*\s*\|\s*([^|\n]+)/);
+      return NextResponse.json({
+        ok: true,
+        found: true,
+        fileName: path.basename(filePath),
+        style: styleMatch?.[1]?.trim() ?? null,
+      });
     }
 
-    const md = fs.readFileSync(filePath, "utf8");
-    const styleMatch = md.match(/\*\*Estilo detectado\*\*\s*\|\s*([^|\n]+)/);
+    // Sin archivo → buscar el tono en Supabase (caso normal en producción).
+    try {
+      const { data } = await supabase
+        .from("tone_profiles")
+        .select("person_name, writing_style");
+      const match = (data ?? []).find(
+        (row) => normalize(row.person_name ?? "") === normalize(person)
+      );
+      if (match) {
+        const style = (match.writing_style ?? "").trim();
+        return NextResponse.json({
+          ok: true,
+          found: true,
+          fileName: "Tono guardado en la nube",
+          style: style ? style.charAt(0).toUpperCase() + style.slice(1) : null,
+        });
+      }
+    } catch (e) {
+      console.error("tone-profile GET (supabase person) error:", e);
+    }
 
-    return NextResponse.json({
-      ok: true,
-      found: true,
-      fileName: path.basename(filePath),
-      style: styleMatch?.[1]?.trim() ?? null,
-    });
+    return NextResponse.json({ ok: true, found: false });
   } catch (err) {
     console.error("tone-profile GET error:", err);
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
@@ -135,6 +172,10 @@ export async function POST(request: Request) {
       year: "numeric",
     });
 
+    // El archivo es best-effort: en producción (Vercel) el FS es de solo lectura y
+    // fs.writeFileSync lanza. Eso NO debe tumbar el request — Supabase ya persistió.
+    let fileName: string | null = null;
+    try {
     let filePath = findProfileFile(name);
     if (filePath) {
       let md = fs.readFileSync(filePath, "utf8");
@@ -194,12 +235,25 @@ _Creado desde la app el ${dateLabel}._
 `;
       fs.writeFileSync(filePath, md, "utf8");
     }
+      fileName = path.basename(filePath);
+    } catch (e) {
+      // FS de solo lectura (Vercel) u otro problema de archivo: no es fatal.
+      console.error("tone-profile POST (file write) error:", e);
+    }
+
+    // El guardado se considera exitoso si Supabase persistió (fuente durable).
+    if (!supabaseSaved) {
+      return NextResponse.json(
+        { ok: false, supabase: false, supabaseError, fileName },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
       supabase: supabaseSaved,
       supabaseError,
-      fileName: path.basename(filePath),
+      fileName: fileName ?? "Tono guardado en la nube",
     });
   } catch (err) {
     console.error("tone-profile POST error:", err);
