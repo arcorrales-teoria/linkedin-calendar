@@ -1439,8 +1439,8 @@ function PublicationModal({ state, dark, onSave, onDelete, onClose, onEdit, onGo
 
 // ── ToneAdapterModal ──────────────────────────────────────────────────────────
 
-function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
-  onClose: () => void; initialPerson?: string; people?: string[];
+function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: {
+  onClose: () => void; initialPerson?: string; people?: string[]; onSaved?: (name: string) => void;
 }) {
   const [person,  setPerson]  = useState(initialPerson ?? "");
   const [newName, setNewName] = useState("");
@@ -1484,6 +1484,8 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE }: {
       });
       const data = await res.json();
       setCloud(data.ok ? { supabase: !!data.supabase, fileName: data.fileName ?? "" } : { supabase: false, fileName: "" });
+      // Persistió en la nube → que la persona aparezca y quede seleccionada de inmediato.
+      if (data.ok && data.supabase) onSaved?.(effectiveName);
     } catch {
       setCloud({ supabase: false, fileName: "" });
     }
@@ -2094,9 +2096,9 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
     setProfile(p);
   }, [person, showTone]);
 
-  // Tone profiles available as files in tone_profiles/ (refreshed when the modal closes)
-  useEffect(() => {
-    fetch("/api/tone-profile")
+  // Personas con perfil de tono (archivos + Supabase). Reutilizable para refrescar al instante.
+  const refreshProfiles = useCallback(() => {
+    return fetch("/api/tone-profile")
       .then(r => r.json())
       .then(d => {
         if (d.ok && Array.isArray(d.files)) setProfileFiles(d.files);
@@ -2105,7 +2107,21 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
         }
       })
       .catch(() => {});
-  }, [showTone]);
+  }, []);
+
+  useEffect(() => { refreshProfiles(); }, [showTone, refreshProfiles]);
+
+  // Al guardar un tono → mostrar y seleccionar la persona de inmediato (sin recargar).
+  const handleToneSaved = useCallback((name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    setProfilePeople(prev =>
+      prev.some(p => samePerson(p.name, clean)) ? prev : [...prev, { name: clean, fileName: "" }]
+    );
+    setFileProfileMap(m => { const { [clean]: _drop, ...rest } = m; return rest; });
+    setPerson(clean);
+    refreshProfiles();
+  }, [refreshProfiles]);
 
   // Selected person → load their documented tone profile (cached per person)
   useEffect(() => {
@@ -2744,6 +2760,7 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
         <ToneAdapterModal
           initialPerson={person}
           people={allPeople}
+          onSaved={handleToneSaved}
           onClose={()=>{ setShowTone(false); setFileProfileMap({}); }}
         />
       )}
