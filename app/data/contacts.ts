@@ -28,7 +28,11 @@ export interface Contact {
    * Head of Sales · BDR. Déjalo vacío si no aplica.
    */
   role?: string;
-  /** correo corporativo, por si más adelante se agrega canal email */
+  /**
+   * Correo de Google Calendar de la persona. Lo usan los recordatorios de calendario
+   * (POST /api/calendar-reminders): se invita a este correo a los eventos 9am/4pm.
+   * Sin correo, la persona se omite. Ver RECORDATORIOS_CALENDAR.md.
+   */
   email?: string;
 }
 

@@ -3140,6 +3140,22 @@ export default function CalendarPage() {
     })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación guardada"); })
       .catch(() => notify("error", "No se pudo guardar la publicación.", () => savePub(p)));
+    // Tarjeta nueva con personas → recordatorios 9am/4pm en su calendario (Google Calendar)
+    if (isNew && p.people.length > 0) {
+      fetch("/api/calendar-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(p),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.ok) notify("success", `Recordatorios 9am/4pm enviados a ${d.invited.length} persona${d.invited.length === 1 ? "" : "s"}.`);
+          else if (d.reason === "no_emails") notify("error", "No se crearon recordatorios: falta cargar el correo de las personas en contacts.ts.");
+          else if (d.reason === "not_configured") notify("error", "Recordatorios sin configurar: falta conectar Google Calendar (ver RECORDATORIOS_CALENDAR.md).");
+          else notify("error", "No se pudieron crear los recordatorios de calendario.");
+        })
+        .catch(() => notify("error", "No se pudieron crear los recordatorios de calendario."));
+    }
   }
 
   function deletePub(id: string) {
