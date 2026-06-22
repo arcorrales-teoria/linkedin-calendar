@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+
+const supabase = createClient(
+  "https://kbtbqsglagdurlqtlnww.supabase.co",
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 function normalize(str: string) {
   return str
@@ -8,6 +14,33 @@ function normalize(str: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s]/g, "");
+}
+
+// Tono guardado en Supabase (caso normal en producci\u00f3n: el FS es de solo lectura,
+// as\u00ed que las personas creadas desde la app no tienen archivo .md). Devuelve un
+// bloque de perfil equivalente al del archivo, con sus posts reales de referencia.
+async function buildToneSectionFromSupabase(personName: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("tone_profiles")
+      .select("person_name, writing_style, sample_text, uses_emojis, uses_hashtags, uses_questions, uses_lists, avg_words_per_post");
+    const row = (data ?? []).find(
+      (r) => normalize(r.person_name ?? "") === normalize(personName)
+    );
+    if (!row || !(row.sample_text ?? "").trim()) return "";
+    const flags = [
+      `estilo ${row.writing_style ?? "profesional"}`,
+      `${row.uses_emojis ? "usa" : "no usa"} emojis`,
+      `${row.uses_hashtags ? "usa" : "no usa"} hashtags`,
+      `${row.uses_questions ? "usa" : "no usa"} preguntas`,
+      `${row.uses_lists ? "usa" : "no usa"} listas`,
+      row.avg_words_per_post ? `~${row.avg_words_per_post} palabras/post` : "",
+    ].filter(Boolean).join(" \u00b7 ");
+    return `Caracter\u00edsticas: ${flags}.\n\nPosts de referencia (su voz real):\n${(row.sample_text ?? "").slice(0, 9000)}`;
+  } catch (e) {
+    console.error("generate-post (supabase tone) error:", e);
+    return "";
+  }
 }
 
 function findProfileFile(personName: string): string | null {
@@ -189,12 +222,14 @@ export async function POST(request: Request) {
       : length?.startsWith("Largo") ? "Largo (5+ párrafos)."
       : "Medio (3-4 párrafos).";
 
-    // Perfil de tono documentado en tone_profiles/ — manda sobre el parámetro "Tono"
+    // Perfil de tono (archivo en tone_profiles/ o Supabase) — manda sobre el parámetro "Tono"
     let toneProfileSection = "";
     if (personName) {
       const profilePath = findProfileFile(personName);
-      if (profilePath) {
-        const md = fs.readFileSync(profilePath, "utf8").slice(0, 9000);
+      const toneBody = profilePath
+        ? fs.readFileSync(profilePath, "utf8").slice(0, 9000)
+        : await buildToneSectionFromSupabase(personName);
+      if (toneBody) {
         toneProfileSection = `
 
 PERFIL DE TONO PERSONAL — ${personName}
@@ -203,7 +238,7 @@ Este perfil tiene prioridad sobre el parámetro "Tono". Imita su estructura de p
 muletillas, uso de emojis, hashtags y listas, y su longitud promedio. Usa los posts de referencia
 incluidos como ejemplos de su voz real:
 ---
-${md}
+${toneBody}
 ---`;
       }
     }
@@ -224,7 +259,9 @@ Parámetros:
 
 Entrega solo el post final, listo para publicar. Sin explicaciones ni comentarios adicionales.
 
-IMPORTANTE: El hook va en la primera línea, solo, seguido de una línea en blanco antes del cuerpo. No lo pegues al resto del texto.`;
+IMPORTANTE: El hook va en la primera línea, solo, seguido de una línea en blanco antes del cuerpo. No lo pegues al resto del texto.
+
+El hook debe ser ESPECÍFICO de este tema y este autor, no una plantilla genérica. Evita aperturas comodín como "El futuro de X es ahora", "X es imparable", "X está cambiando el juego" o "¿Alguna vez te has preguntado…". Varía el ángulo del hook (dato concreto, afirmación contraintuitiva, anécdota, tensión, pregunta puntual) y que nazca del contenido real, no de una fórmula.`;
 
     // Prefiere Claude (Anthropic) si hay key; si no, cae a OpenAI GPT-4o.
     if (anthropicKey) {
