@@ -3140,22 +3140,20 @@ export default function CalendarPage() {
     })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación guardada"); })
       .catch(() => notify("error", "No se pudo guardar la publicación.", () => savePub(p)));
-    // Tarjeta nueva con personas → recordatorios 9am/4pm en su calendario (Google Calendar)
-    if (isNew && p.people.length > 0) {
-      fetch("/api/calendar-reminders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(p),
+    // Sincroniza los recordatorios 9am/4pm en Google Calendar (crea al crear, actualiza al editar).
+    fetch("/api/calendar-reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) notify("success", `Recordatorios ${isNew ? "creados" : "actualizados"} para ${d.invited.length} persona${d.invited.length === 1 ? "" : "s"}.`);
+        // Solo avisamos de "falta correo" si la tarjeta sí tiene personas asignadas.
+        else if (d.reason === "no_emails" && p.people.length > 0) notify("error", "Recordatorios: falta cargar el correo de las personas en contacts.ts.");
+        else if (d.reason === "not_configured" && p.people.length > 0) notify("error", "Recordatorios sin configurar: falta conectar Google Calendar.");
       })
-        .then(r => r.json())
-        .then(d => {
-          if (d.ok) notify("success", `Recordatorios 9am/4pm enviados a ${d.invited.length} persona${d.invited.length === 1 ? "" : "s"}.`);
-          else if (d.reason === "no_emails") notify("error", "No se crearon recordatorios: falta cargar el correo de las personas en contacts.ts.");
-          else if (d.reason === "not_configured") notify("error", "Recordatorios sin configurar: falta conectar Google Calendar (ver RECORDATORIOS_CALENDAR.md).");
-          else notify("error", "No se pudieron crear los recordatorios de calendario.");
-        })
-        .catch(() => notify("error", "No se pudieron crear los recordatorios de calendario."));
-    }
+      .catch(() => { if (p.people.length > 0) notify("error", "No se pudieron sincronizar los recordatorios de calendario."); });
   }
 
   function deletePub(id: string) {
@@ -3168,6 +3166,12 @@ export default function CalendarPage() {
     })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación eliminada"); })
       .catch(() => notify("error", "No se pudo eliminar la publicación."));
+    // Borra también los recordatorios 9am/4pm de Google Calendar (si los hubiera).
+    fetch("/api/calendar-reminders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
   }
 
   function weekFlags(week: Date[]) {

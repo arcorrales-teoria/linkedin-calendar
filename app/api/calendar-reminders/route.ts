@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { findContact } from "@/app/data/contacts";
 
-// POST /api/calendar-reminders
-//   Crea 2 eventos en Google Calendar (9:00 y 16:00, hora local del país de la tarjeta)
-//   el día de la publicación, e invita por correo a cada persona asignada.
-//   Lo dispara la app al crear una publicación nueva (ver savePub en app/page.tsx).
+// /api/calendar-reminders — recordatorios 9am/4pm en Google Calendar por publicación.
 //
-//   Auth: OAuth de una cuenta organizadora (un service account NO puede invitar
-//   asistentes sin delegación de Workspace). Variables de entorno necesarias:
-//     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
-//     GOOGLE_CALENDAR_ID (opcional, por defecto "primary")
-//   Cómo obtenerlas: ver RECORDATORIOS_CALENDAR.md
+//   POST   { ...publication }   crea o ACTUALIZA los 2 eventos e invita por correo.
+//   DELETE { id }               borra los 2 eventos de esa publicación.
+//
+//   No guarda IDs en la base: el id de cada evento se deriva del id de la publicación
+//   (hex) + la hora, así que actualizar/borrar es idempotente sin almacenar nada.
+//
+//   Auth: OAuth de una cuenta organizadora (refresh token). Ver RECORDATORIOS_CALENDAR.md.
+//     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, GOOGLE_CALENDAR_ID (opc.)
 
 const COUNTRY_TZ: Record<string, string> = {
   CO: "America/Bogota",
@@ -22,6 +22,15 @@ const COUNTRY_TZ: Record<string, string> = {
 };
 
 const REMINDER_HOURS = [9, 16]; // 9 am y 4 pm
+
+const calendarId = () => process.env.GOOGLE_CALENDAR_ID ?? "primary";
+
+// Id de evento determinista y válido para Google Calendar (base32hex: solo [a-v0-9]).
+// hex(pubId) usa 0-9a-f; el sufijo de hora son dígitos. Estable entre ediciones.
+function eventId(pubId: string, hour: number): string {
+  const hex = Buffer.from(String(pubId)).toString("hex");
+  return `lcr${hex}${String(hour).padStart(2, "0")}`;
+}
 
 async function getAccessToken(): Promise<string | null> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -39,13 +48,65 @@ async function getAccessToken(): Promise<string | null> {
       grant_type: "refresh_token",
     }),
   });
-
   if (!res.ok) {
     console.error("google token error:", await res.text());
     return null;
   }
-  const data = await res.json();
-  return data.access_token ?? null;
+  return (await res.json()).access_token ?? null;
+}
+
+const calUrl = (suffix = "") =>
+  `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId())}/events${suffix}`;
+
+// Borra un evento por id; ignora 404/410 (ya no existe).
+async function deleteEvent(at: string, id: string): Promise<void> {
+  const res = await fetch(`${calUrl("/" + id)}?sendUpdates=all`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${at}` },
+  });
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    console.error("calendar delete error:", res.status, await res.text());
+  }
+}
+
+// Crea o actualiza el evento con id fijo: PATCH; si no existe (404/410), INSERT con ese id.
+async function upsertEvent(at: string, id: string, event: Record<string, unknown>): Promise<boolean> {
+  const patch = await fetch(`${calUrl("/" + id)}?sendUpdates=all`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
+    body: JSON.stringify(event),
+  });
+  if (patch.ok) return true;
+  if (patch.status !== 404 && patch.status !== 410) {
+    console.error("calendar patch error:", patch.status, await patch.text());
+    return false;
+  }
+  const insert = await fetch(`${calUrl()}?sendUpdates=all`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...event }),
+  });
+  if (!insert.ok) {
+    console.error("calendar insert error:", insert.status, await insert.text());
+    return false;
+  }
+  return true;
+}
+
+function buildEvent(pub: Record<string, unknown>, hour: number, tz: string, attendees: { email: string }[]) {
+  const hh = String(hour).padStart(2, "0");
+  return {
+    summary: `📣 Publicar en LinkedIn: ${pub.title ?? ""}`.trim(),
+    description:
+      "Recordatorio para publicar en LinkedIn.\n\n" +
+      (pub.category ? `Tema: ${pub.category}\n` : "") +
+      (pub.country ? `País: ${pub.country}\n` : "") +
+      (pub.content ? `\nIdea base:\n${pub.content}\n` : ""),
+    start: { dateTime: `${pub.startDate}T${hh}:00:00`, timeZone: tz },
+    end: { dateTime: `${pub.startDate}T${hh}:30:00`, timeZone: tz },
+    attendees,
+    reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 10 }] },
+  };
 }
 
 export async function POST(request: Request) {
@@ -53,12 +114,19 @@ export async function POST(request: Request) {
     const pub = await request.json();
     const startDate: string = pub?.startDate;
     const people: string[] = pub?.people ?? [];
-
-    if (!startDate) {
-      return NextResponse.json({ ok: false, error: "Falta startDate" }, { status: 400 });
+    if (!pub?.id || !startDate) {
+      return NextResponse.json({ ok: false, error: "Falta id o startDate" }, { status: 400 });
     }
 
-    // Resolver correos desde contacts.ts (las personas sin correo se reportan, no se invitan)
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      return NextResponse.json(
+        { ok: false, reason: "not_configured", error: "Faltan credenciales de Google." },
+        { status: 200 }
+      );
+    }
+
+    // Correos de las personas asignadas
     const emails: string[] = [];
     const missing: string[] = [];
     for (const p of people) {
@@ -67,61 +135,48 @@ export async function POST(request: Request) {
       else missing.push(p);
     }
 
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-      return NextResponse.json(
-        { ok: false, reason: "not_configured", error: "Faltan credenciales de Google (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN)." },
-        { status: 200 }
-      );
-    }
+    // Sin destinatarios → asegurarse de que no queden eventos viejos (p. ej. se quitaron todas
+    // las personas al editar) y salir.
     if (emails.length === 0) {
+      for (const hour of REMINDER_HOURS) await deleteEvent(accessToken, eventId(pub.id, hour));
       return NextResponse.json(
-        { ok: false, reason: "no_emails", error: "Ninguna de las personas tiene correo cargado en contacts.ts.", missing },
+        { ok: false, reason: "no_emails", error: "Ninguna de las personas tiene correo en contacts.ts.", missing },
         { status: 200 }
       );
     }
 
     const tz = COUNTRY_TZ[pub.country] ?? "America/Bogota";
-    const calendarId = process.env.GOOGLE_CALENDAR_ID ?? "primary";
     const attendees = emails.map((email) => ({ email }));
 
-    const created: string[] = [];
+    const ids: string[] = [];
     for (const hour of REMINDER_HOURS) {
-      const hh = String(hour).padStart(2, "0");
-      const event = {
-        summary: `📣 Publicar en LinkedIn: ${pub.title ?? ""}`.trim(),
-        description:
-          "Recordatorio para publicar en LinkedIn.\n\n" +
-          (pub.category ? `Tema: ${pub.category}\n` : "") +
-          (pub.country ? `País: ${pub.country}\n` : "") +
-          (pub.content ? `\nIdea base:\n${pub.content}\n` : ""),
-        start: { dateTime: `${startDate}T${hh}:00:00`, timeZone: tz },
-        end: { dateTime: `${startDate}T${hh}:30:00`, timeZone: tz },
-        attendees,
-        reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 10 }] },
-      };
-
-      const res = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify(event),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.text();
-        console.error("calendar event error:", err);
-        return NextResponse.json({ ok: false, error: err, created }, { status: res.status });
-      }
-      const data = await res.json();
-      created.push(data.id);
+      const id = eventId(pub.id, hour);
+      const ok = await upsertEvent(accessToken, id, buildEvent(pub, hour, tz, attendees));
+      if (!ok) return NextResponse.json({ ok: false, error: "Falló la creación/actualización del evento" }, { status: 502 });
+      ids.push(id);
     }
 
-    return NextResponse.json({ ok: true, created, invited: emails, missing });
+    return NextResponse.json({ ok: true, ids, invited: emails, missing });
   } catch (err) {
-    console.error("calendar-reminders error:", err);
+    console.error("calendar-reminders POST error:", err);
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { id } = await request.json();
+    if (!id) return NextResponse.json({ ok: false, error: "Falta id" }, { status: 400 });
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 200 });
+    }
+
+    for (const hour of REMINDER_HOURS) await deleteEvent(accessToken, eventId(id, hour));
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("calendar-reminders DELETE error:", err);
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
 }

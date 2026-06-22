@@ -55,11 +55,14 @@ Tras agregarlas en Vercel, **redespliega** para que tomen efecto.
 
 ---
 
-## Comportamiento y límites (v1)
+## Comportamiento
 
-- Se crean **solo al crear** la publicación (no al editarla). Editar/borrar la tarjeta no actualiza
-  ni elimina los eventos todavía.
+- **Crear** una publicación con personas → crea los 2 eventos (9am/4pm) e invita por correo.
+- **Editar** la publicación → actualiza los mismos eventos (fecha, tema, personas). Si quitas todas
+  las personas, borra los eventos.
+- **Borrar** la publicación → cancela los 2 eventos (los asistentes reciben la cancelación).
+- Los eventos usan un **id determinista** derivado del id de la publicación, así que actualizar y
+  borrar es idempotente sin guardar nada en la base.
 - La zona horaria sale del **país de la tarjeta** (CO→Bogotá, PE→Lima, CL→Santiago, MX→CDMX,
   AR→Buenos Aires; LATAM→Bogotá).
-- Si faltan credenciales o correos, la publicación **igual se guarda**; la app solo avisa que no se
-  crearon los recordatorios.
+- Si faltan credenciales o correos, la publicación **igual se guarda**; la app solo avisa.
