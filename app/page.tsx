@@ -2062,6 +2062,168 @@ function SuggestedAccountsModal({ category, country, publicationId, onChangeCate
   );
 }
 
+// ── PublicationPicker ─────────────────────────────────────────────────────────
+// Selector de publicación del calendario: más recientes primero, muestra 3 y "Ver más".
+
+const PUB_PICKER_VISIBLE = 3;
+
+function PublicationPicker({ pubs, value, onChange, inputStyle }: {
+  pubs: Publication[];
+  value: string;
+  onChange: (id: string) => void;
+  inputStyle: React.CSSProperties;
+}) {
+  const [open, setOpen]       = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, useCallback(() => { setOpen(false); setShowAll(false); }, []));
+
+  // Más recientes primero (fecha de publicación descendente): lo de hoy va arriba.
+  const ordered = useMemo(
+    () => [...pubs].sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [pubs]
+  );
+  const shown = showAll ? ordered : ordered.slice(0, PUB_PICKER_VISIBLE);
+  const hidden = ordered.length - shown.length;
+  const selected = pubs.find(p => p.id === value) || null;
+
+  const optionStyle = (active: boolean): React.CSSProperties => ({
+    display:"flex", alignItems:"center", gap:10, width:"100%",
+    padding:"10px 12px", border:"none", borderRadius:10,
+    background: active ? "var(--cal-cell-hover)" : "transparent",
+    color: active ? "var(--accent)" : "var(--text-primary)",
+    cursor:"pointer", fontSize:13.5, fontFamily:"var(--font-sans)", fontWeight:500,
+    textAlign:"left", transition:"background 100ms",
+  });
+  const hoverOn  = (e: React.MouseEvent, active: boolean) => { if (!active) (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-bg)"; };
+  const hoverOff = (e: React.MouseEvent, active: boolean) => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; };
+
+  return (
+    <div ref={ref} style={{ position:"relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ ...inputStyle, cursor:"pointer", display:"flex", alignItems:"center", gap:10, textAlign:"left" }}>
+        {selected ? <>
+          <span style={{ fontSize:16 }}>{CMAP[selected.country].flag}</span>
+          <span style={{ flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{selected.title}</span>
+          <span style={{ fontSize:11, color:"var(--accent)", fontWeight:600, flexShrink:0 }}>{pubDateLabel(selected)}</span>
+        </> : <span style={{ flex:1, color:"var(--text-muted)" }}>— Sin vincular al calendario —</span>}
+        <svg width="11" height="7" viewBox="0 0 11 7" fill="none" style={{ flexShrink:0, opacity:0.6 }}>
+          <path d="M1 1L5.5 5.5L10 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div role="listbox" aria-label="Seleccionar publicación" className="animate-fade-in glass"
+          style={{ position:"absolute", top:"calc(100% + 8px)", left:0, right:0, borderRadius:12, padding:5,
+                   zIndex:100, boxShadow:"var(--shadow-dropdown)", maxHeight:340, overflowY:"auto" }}>
+          <button type="button" role="option" aria-selected={!value}
+            onClick={() => { onChange(""); setOpen(false); setShowAll(false); }}
+            onMouseEnter={e => hoverOn(e, !value)} onMouseLeave={e => hoverOff(e, !value)}
+            style={optionStyle(!value)}>
+            <span style={{ flex:1, color: value ? "var(--text-muted)" : "var(--accent)" }}>— Sin vincular al calendario —</span>
+          </button>
+
+          {shown.map(pub => {
+            const active = pub.id === value;
+            return (
+              <button key={pub.id} type="button" role="option" aria-selected={active}
+                onClick={() => { onChange(pub.id); setOpen(false); setShowAll(false); }}
+                onMouseEnter={e => hoverOn(e, active)} onMouseLeave={e => hoverOff(e, active)}
+                style={optionStyle(active)}>
+                <span style={{ fontSize:16 }}>{CMAP[pub.country].flag}</span>
+                <span style={{ flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{pub.title}</span>
+                <span style={{ fontSize:11, color: active ? "var(--accent)" : "var(--text-muted)", fontWeight:600, flexShrink:0 }}>{pubDateLabel(pub)}</span>
+              </button>
+            );
+          })}
+
+          {hidden > 0 && (
+            <button type="button" onClick={() => setShowAll(true)}
+              style={{ width:"100%", padding:"9px 12px", border:"none", borderRadius:10, background:"transparent",
+                       color:"var(--accent)", cursor:"pointer", fontSize:12.5, fontWeight:700, fontFamily:"var(--font-sans)", textAlign:"center" }}>
+              Ver más ({hidden})
+            </button>
+          )}
+          {showAll && ordered.length > PUB_PICKER_VISIBLE && (
+            <button type="button" onClick={() => setShowAll(false)}
+              style={{ width:"100%", padding:"9px 12px", border:"none", borderRadius:10, background:"transparent",
+                       color:"var(--text-muted)", cursor:"pointer", fontSize:12.5, fontWeight:600, fontFamily:"var(--font-sans)", textAlign:"center" }}>
+              Ver menos
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PersonSelect ──────────────────────────────────────────────────────────────
+// Selector de autor con búsqueda: escribe el nombre en vez de hacer scroll.
+
+function PersonSelect({ value, people, onChange, inputStyle, hasTone }: {
+  value: string;
+  people: string[];
+  onChange: (name: string) => void;
+  inputStyle: React.CSSProperties;
+  hasTone: (name: string) => boolean;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, useCallback(() => setOpen(false), []));
+
+  const filtered = useMemo(
+    () => people.filter(p => p.toLowerCase().includes(query.trim().toLowerCase())),
+    [people, query]
+  );
+
+  return (
+    <div ref={ref} style={{ position:"relative", flex:1 }}>
+      <input
+        type="text"
+        value={open ? query : value}
+        placeholder="Sin tono personal — escribe un nombre…"
+        onFocus={() => { setOpen(true); setQuery(""); }}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        style={{ ...inputStyle, width:"100%", cursor:"text" }}
+      />
+      {open && (
+        <div role="listbox" aria-label="Buscar autor" className="animate-fade-in glass"
+          style={{ position:"absolute", top:"calc(100% + 6px)", left:0, right:0, borderRadius:12, padding:5,
+                   zIndex:100, boxShadow:"var(--shadow-dropdown)", maxHeight:300, overflowY:"auto" }}>
+          <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-bg)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+            style={{ display:"flex", alignItems:"center", width:"100%", padding:"10px 12px", border:"none", borderRadius:10,
+                     background:"transparent", color: value ? "var(--text-muted)" : "var(--accent)", cursor:"pointer",
+                     fontSize:13.5, fontFamily:"var(--font-sans)", fontWeight:500, textAlign:"left" }}>
+            Sin tono personal
+          </button>
+          {filtered.length === 0 ? (
+            <div style={{ padding:"10px 12px", fontSize:12.5, color:"var(--text-muted)", fontFamily:"var(--font-sans)" }}>
+              Sin coincidencias para “{query.trim()}”
+            </div>
+          ) : filtered.map(p => {
+            const active = p === value;
+            return (
+              <button key={p} type="button" onClick={() => { onChange(p); setOpen(false); }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "var(--cal-cell-bg)"; }}
+                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 12px", border:"none", borderRadius:10,
+                         background: active ? "var(--cal-cell-hover)" : "transparent",
+                         color: active ? "var(--accent)" : "var(--text-primary)", cursor:"pointer",
+                         fontSize:13.5, fontFamily:"var(--font-sans)", fontWeight:500, textAlign:"left", transition:"background 100ms" }}>
+                <span style={{ flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p}</span>
+                {hasTone(p) && <span style={{ fontSize:10.5, fontWeight:700, color:"#059669", background:"rgba(5,150,105,0.10)", padding:"1px 7px", borderRadius:20, flexShrink:0 }}>tono listo ✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
 export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { dark: boolean; pubs: Publication[]; initialPubId?: string; extraPeople?: string[] }) {
@@ -2087,9 +2249,6 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
   const [profileFiles,  setProfileFiles]  = useState<string[]>([]);
   const [profilePeople, setProfilePeople] = useState<Array<{ name: string; fileName: string }>>([]);
   const [fileProfileMap, setFileProfileMap] = useState<Record<string, { fileName: string; style: string | null } | null>>({});
-
-  // Sort pubs by proximity to today
-  const sortedPubs = useMemo(() => [...pubs].sort((a,b) => a.startDate.localeCompare(b.startDate)), [pubs]);
 
   useEffect(() => {
     const p = person ? loadToneProfile(person) : null;
@@ -2280,22 +2439,12 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
               </span>
               <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-muted)", fontWeight:500 }}>opcional</span>
             </div>
-            <select
-              style={{ ...inputSt, cursor:"pointer" }}
+            <PublicationPicker
+              pubs={pubs}
               value={selectedPubId}
-              onChange={e => { setSelectedPubId(e.target.value); if (!e.target.value) setTopic(""); }}
-              onFocus={onFocusFn} onBlur={onBlurFn}
-            >
-              <option value="">— Sin vincular al calendario —</option>
-              {sortedPubs.map(pub => {
-                const c = CMAP[pub.country];
-                return (
-                  <option key={pub.id} value={pub.id}>
-                    {c.flag}  {pub.title}  ·  {pubDateLabel(pub)}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={id => { setSelectedPubId(id); if (!id) setTopic(""); }}
+              inputStyle={inputSt}
+            />
             {selectedPub && (
               <div style={{
                 marginTop:10, padding:"10px 12px", borderRadius:10,
@@ -2442,18 +2591,13 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
               Elige quién firma el post y se redactará con su estilo real de LinkedIn.
             </p>
             <div style={{ display:"flex", gap:8 }}>
-              <label htmlFor="post-person" style={{ position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0,0,0,0)" }}>
-                Autor del post
-              </label>
-              <select id="post-person" style={{ ...inputSt, flex:1, cursor:"pointer" }} value={person}
-                onChange={e=>setPerson(e.target.value)} onFocus={onFocusFn} onBlur={onBlurFn}>
-                <option value="">Sin tono personal</option>
-                {allPeople.map(p=>(
-                  <option key={p} value={p}>
-                    {p}{profileFiles.some(f => fileMatchesPerson(f, p)) ? " · tono listo ✓" : ""}
-                  </option>
-                ))}
-              </select>
+              <PersonSelect
+                value={person}
+                people={allPeople}
+                onChange={setPerson}
+                inputStyle={inputSt}
+                hasTone={p => profilePeople.some(pp => samePerson(pp.name, p)) || profileFiles.some(f => fileMatchesPerson(f, p))}
+              />
               <button type="button" onClick={()=>setShowTone(true)}
                 style={{
                   height:48, padding:"0 16px", borderRadius:10, flexShrink:0,
