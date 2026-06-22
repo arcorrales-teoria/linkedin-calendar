@@ -2902,6 +2902,8 @@ export default function CalendarPage() {
   const [customPeople, setCustomPeople] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("custom_people") ?? "[]"); } catch { return []; }
   });
+  // Personas con perfil de tono (Supabase + archivos) — para sugerirlas también al crear cards
+  const [tonePeople, setTonePeople] = useState<string[]>([]);
   // Tarjeta recién creada → dispara la búsqueda de ICPs en Apollo (categoría + país del card)
   const [suggestFor, setSuggestFor] = useState<{ category: string; country: CountryKey; publicationId: string } | null>(null);
 
@@ -2922,9 +2924,21 @@ export default function CalendarPage() {
   }, []);
 
   const allKnownPeople = useMemo(
-    () => [...new Set([...PEOPLE, ...customPeople])],
-    [customPeople]
+    () => [...new Set([...PEOPLE, ...tonePeople, ...customPeople])],
+    [tonePeople, customPeople]
   );
+
+  // Carga las personas que ya tienen tono guardado (p. ej. creadas desde "Adaptar tono")
+  useEffect(() => {
+    fetch("/api/tone-profile")
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok && Array.isArray(d.people)) {
+          setTonePeople(d.people.map((p: { name: string }) => p.name).filter(Boolean));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const todayStr = toDateStr(TODAY);
 
