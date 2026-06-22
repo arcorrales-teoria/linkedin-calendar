@@ -37,18 +37,19 @@ export interface Contact {
 }
 
 export const CONTACTS: Contact[] = [
-  { name: "Ericka Ortegon",     telegram: "", role: "", email: "" },
-  { name: "Maria Juliana",      telegram: "", role: "", email: "" },
-  { name: "Mafe Ramirez",       telegram: "", role: "", email: "" },
+  { name: "Ericka Ortegon",     telegram: "", role: "", email: "eortegon@truora.com" },
+  { name: "Maria Juliana",      telegram: "", role: "", email: "mhernandez@truora.com" },
+  { name: "Mafe Ramirez",       telegram: "", role: "", email: "framirez@truora.com" },
   { name: "Mariangel",          telegram: "", role: "", email: "" },
-  { name: "Gabriela Cala",      telegram: "", role: "", email: "" },
-  { name: "Alessandra Huapaya", telegram: "", role: "", email: "" },
-  { name: "Cesar Lengua",       telegram: "", role: "", email: "" },
+  { name: "Gabriela Cala",      telegram: "", role: "", email: "gcala@truora.com" },
+  { name: "Alessandra Huapaya", telegram: "", role: "", email: "alessandra@truora.com" },
+  { name: "Cesar Lengua",       telegram: "", role: "", email: "clengua@truora.com" },
   { name: "Manuela Peña",       telegram: "", role: "", email: "" },
   { name: "Daniel Bilbao",      telegram: "", role: "", email: "" },
-  { name: "Daniel Villegas",    telegram: "", role: "", email: "" },
+  { name: "Daniel Villegas",    telegram: "", role: "", email: "dvillegas@truora.com" },
   { name: "Lony Milena",        telegram: "", role: "", email: "" },
   { name: "Christian Rojas",    telegram: "", role: "", email: "" },
+  { name: "Paulina Gaviria",    telegram: "", role: "", email: "pgaviria@truora.com" },
 ];
 
 /** Normaliza un nombre para comparar sin tildes ni mayúsculas. */
