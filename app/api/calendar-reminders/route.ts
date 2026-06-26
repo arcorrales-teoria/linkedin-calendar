@@ -1,5 +1,53 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { findContact } from "@/app/data/contacts";
+
+const supabase = createClient(
+  "https://kbtbqsglagdurlqtlnww.supabase.co",
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Normaliza un nombre para comparar sin tildes ni mayúsculas (mismo criterio que la app).
+function normName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim();
+}
+
+// ¿Son la misma persona? Tolerante a tildes/orden/subconjunto (ej. "Maria" ⊆ "Maria Juliana").
+function samePerson(a: string, b: string): boolean {
+  const pa = normName(a).split(/\s+/).filter((w) => w.length > 1);
+  const pb = normName(b).split(/\s+/).filter((w) => w.length > 1);
+  if (pa.length === 0 || pb.length === 0) return false;
+  return pa.every((w) => pb.includes(w)) || pb.every((w) => pa.includes(w));
+}
+
+// Correos que las personas cargaron al adaptar su tono (tabla tone_profiles de Supabase).
+// Es la fuente self-service: la persona pone su correo en la app y no hay que editar contacts.ts.
+async function loadSupabaseEmails(): Promise<{ name: string; email: string }[]> {
+  try {
+    const { data } = await supabase
+      .from("tone_profiles")
+      .select("person_name, email");
+    return (data ?? [])
+      .map((r) => ({ name: (r.person_name ?? "").trim(), email: (r.email ?? "").trim() }))
+      .filter((r) => r.name && r.email);
+  } catch (e) {
+    console.error("calendar-reminders (supabase emails) error:", e);
+    return [];
+  }
+}
+
+// Resuelve el correo de una persona: primero contacts.ts (hardcode), luego Supabase (self-service).
+function emailFor(person: string, supaEmails: { name: string; email: string }[]): string | null {
+  const fromContacts = findContact(person)?.email?.trim();
+  if (fromContacts) return fromContacts;
+  const fromSupabase = supaEmails.find((r) => samePerson(r.name, person));
+  return fromSupabase?.email ?? null;
+}
 
 // /api/calendar-reminders — recordatorios 9am/4pm en Google Calendar por publicación.
 //
@@ -126,11 +174,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Correos de las personas asignadas
+    // Correos de las personas asignadas (contacts.ts + correos cargados en su perfil de tono)
+    const supaEmails = await loadSupabaseEmails();
     const emails: string[] = [];
     const missing: string[] = [];
     for (const p of people) {
-      const email = findContact(p)?.email?.trim();
+      const email = emailFor(p, supaEmails);
       if (email) emails.push(email);
       else missing.push(p);
     }
@@ -140,7 +189,7 @@ export async function POST(request: Request) {
     if (emails.length === 0) {
       for (const hour of REMINDER_HOURS) await deleteEvent(accessToken, eventId(pub.id, hour));
       return NextResponse.json(
-        { ok: false, reason: "no_emails", error: "Ninguna de las personas tiene correo en contacts.ts.", missing },
+        { ok: false, reason: "no_emails", error: "Ninguna de las personas tiene correo cargado (ni en contacts.ts ni en su perfil de tono).", missing },
         { status: 200 }
       );
     }

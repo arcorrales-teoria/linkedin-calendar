@@ -40,6 +40,7 @@ export interface Publication {
 interface ToneProfile {
   personName: string;
   linkedinUrl: string;
+  email?: string;
   sampleText: string;
   usesEmojis: boolean;
   usesHashtags: boolean;
@@ -1445,6 +1446,7 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: 
   const [person,  setPerson]  = useState(initialPerson ?? "");
   const [newName, setNewName] = useState("");
   const [url,     setUrl]     = useState("");
+  const [email,   setEmail]   = useState("");
   const [sample,  setSample]  = useState("");
   const [saved,   setSaved]   = useState<ToneProfile | null>(null);
   const [status,  setStatus]  = useState<"idle"|"analyzing"|"done">("idle");
@@ -1454,14 +1456,20 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: 
 
   useEffect(() => {
     if (person === "__new__") {
-      setSaved(null); setCloud(null); setUrl(""); setSample("");
+      setSaved(null); setCloud(null); setUrl(""); setEmail(""); setSample("");
       return;
     }
     if (person) {
       const p = loadToneProfile(person);
       setSaved(p); setCloud(null);
-      if (p) { setUrl(p.linkedinUrl); setSample(p.sampleText); }
-      else   { setUrl(""); setSample(""); }
+      if (p) { setUrl(p.linkedinUrl); setEmail(p.email ?? ""); setSample(p.sampleText); }
+      else   { setUrl(""); setEmail(""); setSample(""); }
+      // El correo y el estilo viven en Supabase (en producción no hay localStorage compartido):
+      // tráelos para precargar el campo aunque la persona se haya creado en otro dispositivo.
+      fetch(`/api/tone-profile?person=${encodeURIComponent(person)}`)
+        .then(r => r.json())
+        .then(d => { if (d.ok && d.found && d.email) setEmail(prev => prev || d.email); })
+        .catch(() => {});
     }
   }, [person]);
 
@@ -1475,6 +1483,7 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: 
     if (!effectiveName || sample.trim().length < 30) return;
     setStatus("analyzing");
     const profile = analyzeTone(sample, effectiveName, url.trim());
+    profile.email = email.trim();
     saveToneProfile(profile);
     try {
       const res = await fetch("/api/tone-profile", {
@@ -1615,6 +1624,20 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: 
                 </button>
               )}
             </div>
+          </div>
+
+          {/* email — para invitar a la persona a los recordatorios del calendario */}
+          <div>
+            <HintLabel style={labelSt}
+              title="Correo para recordatorios"
+              hint="El correo de Google de la persona. Cuando se le agende una publicación, se le invita a los eventos de recordatorio (9am y 4pm) en Google Calendar. Sin correo, no recibe la invitación.">
+              Correo (para recordatorios del calendario)
+            </HintLabel>
+            <input style={inputSt} type="email" value={email}
+              onChange={e=>setEmail(e.target.value)}
+              placeholder="nombre@truora.com"
+              aria-label="Correo para recordatorios del calendario"
+              onFocus={onFocus} onBlur={onBlur} />
           </div>
 
           {/* sample posts */}
@@ -3169,7 +3192,7 @@ export default function CalendarPage() {
       .then(d => {
         if (d.ok) notify("success", `Recordatorios ${isNew ? "creados" : "actualizados"} para ${d.invited.length} persona${d.invited.length === 1 ? "" : "s"}.`);
         // Solo avisamos de "falta correo" si la tarjeta sí tiene personas asignadas.
-        else if (d.reason === "no_emails" && p.people.length > 0) notify("error", "Recordatorios: falta cargar el correo de las personas en contacts.ts.");
+        else if (d.reason === "no_emails" && p.people.length > 0) notify("error", "Recordatorios: las personas no tienen correo. Agrégalo en “Adaptar tono”.");
         else if (d.reason === "not_configured" && p.people.length > 0) notify("error", "Recordatorios sin configurar: falta conectar Google Calendar.");
       })
       .catch(() => { if (p.people.length > 0) notify("error", "No se pudieron sincronizar los recordatorios de calendario."); });

@@ -97,7 +97,7 @@ export async function GET(request: Request) {
     try {
       const { data } = await supabase
         .from("tone_profiles")
-        .select("person_name, writing_style");
+        .select("person_name, writing_style, email");
       const match = (data ?? []).find(
         (row) => normalize(row.person_name ?? "") === normalize(person)
       );
@@ -108,6 +108,7 @@ export async function GET(request: Request) {
           found: true,
           fileName: "Tono guardado en la nube",
           style: style ? style.charAt(0).toUpperCase() + style.slice(1) : null,
+          email: (match.email ?? "").trim(),
         });
       }
     } catch (e) {
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
     const profile = await request.json();
     const name: string = (profile?.personName ?? "").trim();
     const sample: string = (profile?.sampleText ?? "").trim();
+    const email: string = (profile?.email ?? "").trim();
 
     if (!name || sample.length < 30) {
       return NextResponse.json(
@@ -141,21 +143,24 @@ export async function POST(request: Request) {
     let supabaseSaved = false;
     let supabaseError: string | null = null;
     try {
-      const { error } = await supabase.from("tone_profiles").upsert(
-        {
-          person_name: name,
-          linkedin_url: profile.linkedinUrl ?? "",
-          sample_text: sample,
-          writing_style: profile.writingStyle ?? "profesional",
-          uses_emojis: !!profile.usesEmojis,
-          uses_hashtags: !!profile.usesHashtags,
-          uses_questions: !!profile.usesQuestions,
-          uses_lists: !!profile.usesLists,
-          avg_words_per_post: profile.avgWordsPerPost ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "person_name" }
-      );
+      const row: Record<string, unknown> = {
+        person_name: name,
+        linkedin_url: profile.linkedinUrl ?? "",
+        sample_text: sample,
+        writing_style: profile.writingStyle ?? "profesional",
+        uses_emojis: !!profile.usesEmojis,
+        uses_hashtags: !!profile.usesHashtags,
+        uses_questions: !!profile.usesQuestions,
+        uses_lists: !!profile.usesLists,
+        avg_words_per_post: profile.avgWordsPerPost ?? null,
+        updated_at: new Date().toISOString(),
+      };
+      // Solo escribimos el correo cuando viene con valor: así no borramos uno ya guardado
+      // si la persona vuelve a analizar su tono desde un dispositivo sin el correo cargado.
+      if (email) row.email = email;
+      const { error } = await supabase
+        .from("tone_profiles")
+        .upsert(row, { onConflict: "person_name" });
       if (error) supabaseError = error.message;
       else supabaseSaved = true;
     } catch (e) {
