@@ -2226,7 +2226,7 @@ function PersonSelect({ value, people, onChange, inputStyle, hasTone }: {
 
 // ── PostCreator ───────────────────────────────────────────────────────────────
 
-export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { dark: boolean; pubs: Publication[]; initialPubId?: string; extraPeople?: string[] }) {
+export function PostCreator({ dark, pubs, initialPubId, extraPeople = [], onPersonAdded }: { dark: boolean; pubs: Publication[]; initialPubId?: string; extraPeople?: string[]; onPersonAdded?: (name: string) => void }) {
   const [selectedPubId, setSelectedPubId] = useState(initialPubId ?? "");
   const [country,  setCountry]  = useState<CountryKey>("LATAM");
   const [topic,    setTopic]    = useState("");
@@ -2280,7 +2280,10 @@ export function PostCreator({ dark, pubs, initialPubId, extraPeople = [] }: { da
     setFileProfileMap(m => { const { [clean]: _drop, ...rest } = m; return rest; });
     setPerson(clean);
     refreshProfiles();
-  }, [refreshProfiles]);
+    // Avisa al calendario para que la persona quede disponible en el selector de las
+    // tarjetas de inmediato (sin recargar) y se vuelva a leer la lista desde Supabase.
+    onPersonAdded?.(clean);
+  }, [refreshProfiles, onPersonAdded]);
 
   // Selected person → load their documented tone profile (cached per person)
   useEffect(() => {
@@ -3048,6 +3051,7 @@ export default function CalendarPage() {
   });
   // Personas con perfil de tono (Supabase + archivos) — para sugerirlas también al crear cards
   const [tonePeople, setTonePeople] = useState<string[]>([]);
+  const [syncingPeople, setSyncingPeople] = useState(false);
   // Tarjeta recién creada → dispara la búsqueda de ICPs en Apollo (categoría + país del card)
   const [suggestFor, setSuggestFor] = useState<{ category: string; country: CountryKey; publicationId: string } | null>(null);
 
@@ -3072,17 +3076,32 @@ export default function CalendarPage() {
     [tonePeople, customPeople]
   );
 
-  // Carga las personas que ya tienen tono guardado (p. ej. creadas desde "Adaptar tono")
-  useEffect(() => {
-    fetch("/api/tone-profile")
+  // Lee desde Supabase las personas que ya tienen tono guardado y refresca el selector.
+  // `announce` = lo disparó el usuario con el botón → avisamos el resultado con un toast.
+  const refreshTonePeople = useCallback((announce = false) => {
+    return fetch("/api/tone-profile")
       .then(r => r.json())
       .then(d => {
         if (d.ok && Array.isArray(d.people)) {
-          setTonePeople(d.people.map((p: { name: string }) => p.name).filter(Boolean));
+          const names = (d.people as { name: string }[]).map(p => p.name).filter(Boolean);
+          setTonePeople(names);
+          if (announce) notify("success", `Personas sincronizadas (${names.length} con tono guardado).`);
+        } else if (announce) {
+          notify("error", "No se pudieron sincronizar las personas.");
         }
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => { if (announce) notify("error", "No se pudieron sincronizar las personas."); })
+      .finally(() => { if (announce) setSyncingPeople(false); });
+  }, [notify]);
+
+  // Botón "Sincronizar personas": enciende el spinner y vuelve a leer desde Supabase.
+  const syncPeople = useCallback(() => {
+    setSyncingPeople(true);
+    refreshTonePeople(true);
+  }, [refreshTonePeople]);
+
+  // Carga inicial de las personas con tono guardado (p. ej. creadas desde "Adaptar tono").
+  useEffect(() => { refreshTonePeople(); }, [refreshTonePeople]);
 
   const todayStr = toDateStr(TODAY);
 
@@ -3252,6 +3271,17 @@ export default function CalendarPage() {
                 >
                   <CountryDropdown selected={filter} onChange={setFilter} />
                 </HintZone>
+                <HintZone
+                  title="Sincronizar personas"
+                  hint="Vuelve a leer desde Supabase las personas que ya tienen tono adaptado y las suma al selector de las tarjetas. Úsalo si alguien agregó una persona nueva y todavía no te aparece para seleccionarla."
+                >
+                  <GlassBtn onClick={syncPeople} disabled={syncingPeople} aria-label="Sincronizar personas con tono guardado">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ animation: syncingPeople ? "spin 0.8s linear infinite" : undefined }}>
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36M21 4v5h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {syncingPeople ? "Sincronizando…" : "Sincronizar personas"}
+                  </GlassBtn>
+                </HintZone>
               </>
             )}
             <GlassBtn onClick={() => setDark(!dark)} small aria-label={dark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}>
@@ -3263,7 +3293,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} initialPubId={createPubId} key={createPubId} extraPeople={customPeople} />}
+        {activeTab === "create" && <PostCreator dark={dark} pubs={pubs} initialPubId={createPubId} key={createPubId} extraPeople={customPeople} onPersonAdded={name => { addPerson(name); refreshTonePeople(); }} />}
 
         {activeTab === "calendar" && <>
         {/* ── Month header ── */}
