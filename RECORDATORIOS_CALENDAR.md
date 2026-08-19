@@ -1,12 +1,12 @@
-# Recordatorios en Google Calendar (9am / 4pm)
+# Recordatorios en Google Calendar (8am / 9am)
 
 Cuando creas una **publicación nueva** en el calendario con personas asignadas, la app crea
-**2 eventos** en Google Calendar (a las **9:00** y **16:00**, hora local del país de la tarjeta)
+**2 eventos** en Google Calendar (a las **8:00** y **9:00**, hora local del país de la tarjeta)
 el día de la publicación, e **invita por correo** a cada persona.
 
 ```
 Crear publicación  →  POST /api/calendar-reminders  →  Google Calendar
-(con personas)        (cuenta organizadora OAuth)       2 eventos (9am, 4pm)
+(con personas)        (cuenta organizadora OAuth)       2 eventos (8am, 9am)
                                                          invita por email a cada persona
 ```
 
@@ -57,7 +57,7 @@ Tras agregarlas en Vercel, **redespliega** para que tomen efecto.
 
 ## Comportamiento
 
-- **Crear** una publicación con personas → crea los 2 eventos (9am/4pm) e invita por correo.
+- **Crear** una publicación con personas → crea los 2 eventos (8am/9am) e invita por correo.
 - **Editar** la publicación → actualiza los mismos eventos (fecha, tema, personas). Si quitas todas
   las personas, borra los eventos.
 - **Borrar** la publicación → cancela los 2 eventos (los asistentes reciben la cancelación).

@@ -1630,7 +1630,7 @@ function ToneAdapterModal({ onClose, initialPerson, people = PEOPLE, onSaved }: 
           <div>
             <HintLabel style={labelSt}
               title="Correo para recordatorios"
-              hint="El correo de Google de la persona. Cuando se le agende una publicación, se le invita a los eventos de recordatorio (9am y 4pm) en Google Calendar. Sin correo, no recibe la invitación.">
+              hint="El correo de Google de la persona. Cuando se le agende una publicación, se le invita a los eventos de recordatorio (8am y 9am) en Google Calendar. Sin correo, no recibe la invitación.">
               Correo (para recordatorios del calendario)
             </HintLabel>
             <input style={inputSt} type="email" value={email}
@@ -3182,7 +3182,7 @@ export default function CalendarPage() {
     })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación guardada"); })
       .catch(() => notify("error", "No se pudo guardar la publicación.", () => savePub(p)));
-    // Sincroniza los recordatorios 9am/4pm en Google Calendar (crea al crear, actualiza al editar).
+    // Sincroniza los recordatorios 8am/9am en Google Calendar (crea al crear, actualiza al editar).
     fetch("/api/calendar-reminders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3208,7 +3208,7 @@ export default function CalendarPage() {
     })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); notify("success", "Publicación eliminada"); })
       .catch(() => notify("error", "No se pudo eliminar la publicación."));
-    // Borra también los recordatorios 9am/4pm de Google Calendar (si los hubiera).
+    // Borra también los recordatorios 8am/9am de Google Calendar (si los hubiera).
     fetch("/api/calendar-reminders", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },

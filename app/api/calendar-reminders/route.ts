@@ -49,7 +49,7 @@ function emailFor(person: string, supaEmails: { name: string; email: string }[])
   return fromSupabase?.email ?? null;
 }
 
-// /api/calendar-reminders — recordatorios 9am/4pm en Google Calendar por publicación.
+// /api/calendar-reminders — recordatorios 8am/9am en Google Calendar por publicación.
 //
 //   POST   { ...publication }   crea o ACTUALIZA los 2 eventos e invita por correo.
 //   DELETE { id }               borra los 2 eventos de esa publicación.
@@ -69,7 +69,7 @@ const COUNTRY_TZ: Record<string, string> = {
   LATAM: "America/Bogota",
 };
 
-const REMINDER_HOURS = [9, 16]; // 9 am y 4 pm
+const REMINDER_HOURS = [8, 9]; // 8 am y 9 am
 
 const calendarId = () => process.env.GOOGLE_CALENDAR_ID ?? "primary";
 
